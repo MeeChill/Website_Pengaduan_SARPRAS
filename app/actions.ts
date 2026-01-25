@@ -20,6 +20,12 @@ async function getYayasanId() {
 }
 
 export async function createAspirasi(formData: FormData) {
+  // Check limit
+  const count = await prisma.inputAspirasi.count()
+  if (count >= 1000) {
+    throw new Error("Maksimal data aspirasi telah tercapai (1000 data)")
+  }
+
   const judul = formData.get('judul') as string
   const deskripsi = formData.get('deskripsi') as string
   const lokasi = formData.get('lokasi') as string
@@ -178,6 +184,12 @@ export async function updateProgress(aspirasiId: number, status: string, userId:
 }
 
 export async function createUser(formData: FormData) {
+  // Check limit
+  const count = await prisma.user.count()
+  if (count >= 1000) {
+    throw new Error("Maksimal data user telah tercapai (1000 data)")
+  }
+
   const nama = formData.get('nama') as string
   const username = formData.get('username') as string
   const password = formData.get('password') as string
