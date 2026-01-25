@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  nama      String
+  username  String   @unique
+  password  String
+  role      String   // enum: "siswa", "admin", "yayasan" (SQLite doesn't support enums natively in Prisma in the same way, but we can use String and validate in app, or use simple string for now)
+  nisn      String?
+  kelas     String?
+  
+  // Relations
+  input_aspirasi     InputAspirasi[] @relation("SiswaAspirasi")
+  aspirasi_validasi  Aspirasi[]      @relation("AdminValidasi")
+  aspirasi_admin     Aspirasi[]      @relation("AdminProses")
+  progres_updates    ProgresUpdate[]
+  notifikasi         Notifikasi[]
+
+  @@map("users")
+}
+
+model Kategori {
+  id             Int             @id @default(autoincrement())
+  nama_kategori  String
+  deskripsi      String?
+
+  // Relations
+  input_aspirasi InputAspirasi[]
+
+  @@map("kategori")
+}
+
+model InputAspirasi {
+  id            Int      @id @default(autoincrement())
+  siswa_id      Int
+  kategori_id   Int
+  judul         String
+  deskripsi     String
+  lokasi        String
+  foto          String?
+  tanggal_input DateTime @default(now())
+
+  // Relations
+  siswa         User     @relation("SiswaAspirasi", fields: [siswa_id], references: [id])
+  kategori      Kategori @relation(fields: [kategori_id], references: [id])
+  aspirasi      Aspirasi? // One-to-one relation, one input becomes one aspirasi process
+  notifikasi    Notifikasi[]
+
+  @@map("input_aspirasi")
+}
+
+model Aspirasi {
+  id                Int       @id @default(autoincrement())
+  input_aspirasi_id Int       @unique
+  validasi_oleh     Int?
+  tanggal_validasi  DateTime?
+  status_validasi   String    @default("pending") // enum: pending, disetujui, ditolak
+  catatan_validasi  String?
+  admin_id          Int?
+  tanggal_mulai     DateTime?
+  status_progres    String    @default("belum_dimulai") // enum: belum_dimulai, dalam_progres, selesai
+  feedback          String?
+  tanggal_selesai   DateTime?
+
+  // Relations
+  input_aspirasi    InputAspirasi   @relation(fields: [input_aspirasi_id], references: [id])
+  validator         User?           @relation("AdminValidasi", fields: [validasi_oleh], references: [id])
+  admin             User?           @relation("AdminProses", fields: [admin_id], references: [id])
+  progres_updates   ProgresUpdate[]
+  notifikasi        Notifikasi[]
+
+  @@map("aspirasi")
+}
+
+model ProgresUpdate {
+  id               Int      @id @default(autoincrement())
+  aspirasi_id      Int
+  admin_id         Int
+  deskripsi_update String
+  tanggal_update   DateTime @default(now())
+
+  // Relations
+  aspirasi         Aspirasi @relation(fields: [aspirasi_id], references: [id])
+  admin            User     @relation(fields: [admin_id], references: [id])
+
+  @@map("progres_update")
+}
+
+model Notifikasi {
+  id                Int      @id @default(autoincrement())
+  penerima_id       Int
+  jenis             String   // enum
+  pesan             String
+  input_aspirasi_id Int?
+  aspirasi_id       Int?
+  dibaca            Boolean  @default(false)
+  tanggal_notif     DateTime @default(now())
+
+  // Relations
+  penerima          User           @relation(fields: [penerima_id], references: [id])
+  input_aspirasi    InputAspirasi? @relation(fields: [input_aspirasi_id], references: [id])
+  aspirasi          Aspirasi?      @relation(fields: [aspirasi_id], references: [id])
+
+  @@map("notifikasi")
+}
