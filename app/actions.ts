@@ -40,14 +40,37 @@ export async function createAspirasi(formData: FormData) {
     const bytes = await fotoFile.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    const uploadDir = join(process.cwd(), 'public/uploads')
-    await mkdir(uploadDir, { recursive: true })
+    // Using /tmp directory for Vercel (serverless environment)
+    // Note: In production Vercel, this file will disappear after the function finishes.
+    // For persistent storage, use AWS S3, Cloudinary, or Vercel Blob.
+    // But for this school project, we will try to write to /tmp and see if we can serve it, 
+    // OR we just convert to Base64 to store in DB (not recommended for large files but works for small demo).
+    
+    // BETTER APPROACH FOR VERCEL DEMO WITHOUT EXTERNAL STORAGE:
+    // We can't easily serve static files from /tmp in Next.js App Router on Vercel.
+    // So we will skip saving to disk and just not support image persistence in this specific Vercel deployment 
+    // unless we use an external service.
+    
+    // HOWEVER, to fix the crash "EROFS: read-only file system", we must stop writing to public/uploads.
+    
+    // For this specific error fix, let's just log it and NOT write the file if we are in production/vercel.
+    // Or write to /tmp just to process it (but it won't be served).
+    
+    if (process.env.VERCEL) {
+        // In Vercel, we can't write to public/uploads. 
+        // We will skip file saving to avoid the crash.
+        console.log("Skipping file upload in Vercel environment (Read-only filesystem). Use S3/Blob for persistence.")
+        fotoUrl = null // or maybe a placeholder image
+    } else {
+        const uploadDir = join(process.cwd(), 'public/uploads')
+        await mkdir(uploadDir, { recursive: true })
 
-    const filename = `${Date.now()}-${fotoFile.name.replace(/\s/g, '-')}`
-    const filepath = join(uploadDir, filename)
+        const filename = `${Date.now()}-${fotoFile.name.replace(/\s/g, '-')}`
+        const filepath = join(uploadDir, filename)
 
-    await writeFile(filepath, buffer)
-    fotoUrl = `/uploads/${filename}`
+        await writeFile(filepath, buffer)
+        fotoUrl = `/uploads/${filename}`
+    }
   }
 
   const input = await prisma.inputAspirasi.create({
