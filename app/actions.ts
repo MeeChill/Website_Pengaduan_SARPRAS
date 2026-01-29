@@ -6,6 +6,34 @@ import { redirect } from "next/navigation"
 import { writeFile, mkdir } from "fs/promises"
 import { join } from "path"
 import { hash } from "bcryptjs"
+import { pusherServer } from '@/lib/pusher'
+import { resend } from '@/lib/resend'
+
+// --- Helpers for Real-time & Email ---
+async function triggerRealtimeNotification(userId: number, message: string) {
+  try {
+    if (pusherServer) {
+      await pusherServer.trigger(`user-${userId}`, 'new-notification', { message })
+    }
+  } catch (e) {
+    console.error("Pusher error:", e)
+  }
+}
+
+async function sendEmailNotification(to: string, subject: string, text: string) {
+  try {
+    if (resend) {
+      await (resend as any).emails.send({
+        from: 'Neo-Sarana <notifications@yourdomain.com>',
+        to: [to],
+        subject,
+        text
+      })
+    }
+  } catch (e) {
+    console.error("Resend error:", e)
+  }
+}
 
 // Helper to get an admin ID
 async function getAdminId() {
@@ -92,20 +120,22 @@ export async function createAspirasi(formData: FormData) {
     }
   })
 
-  // Notify Admin
-  const adminId = await getAdminId()
-  if (adminId) {
+  // 4. Notification for all Admins
+  const admins = await prisma.user.findMany({ where: { role: 'admin' } })
+  for (const admin of admins) {
     await prisma.notifikasi.create({
       data: {
-        penerima_id: adminId,
+        penerima_id: admin.id,
         jenis: 'info',
         pesan: `Aspirasi baru: ${judul}`,
         input_aspirasi_id: input.id,
         aspirasi_id: aspirasi.id
       }
     })
+    await triggerRealtimeNotification(admin.id, `Aspirasi baru: ${judul}`)
   }
 
+  revalidatePath('/dashboard')
   revalidatePath('/dashboard/aspirasi')
   redirect('/dashboard/aspirasi')
 }
@@ -125,49 +155,57 @@ export async function updateValidation(aspirasiId: number, status: string, userI
   // Notifications
   if (status === 'diajukan') {
     // Admin -> Yayasan
-    const yayasanId = await getYayasanId()
-    if (yayasanId) {
+    const yayasans = await prisma.user.findMany({ where: { role: 'yayasan' } })
+    for (const y of yayasans) {
+      const message = `Validasi diperlukan: ${updated.input_aspirasi.judul}`
       await prisma.notifikasi.create({
         data: {
-          penerima_id: yayasanId,
+          penerima_id: y.id,
           jenis: 'warning',
-          pesan: `Validasi diperlukan: ${updated.input_aspirasi.judul}`,
+          pesan: message,
           aspirasi_id: aspirasiId
         }
       })
+      await triggerRealtimeNotification(y.id, message)
     }
   } else if (status === 'disetujui') {
     // Yayasan -> Siswa & Admin
+    const messageSiswa = `Aspirasi Anda disetujui: ${updated.input_aspirasi.judul}`
     await prisma.notifikasi.create({
       data: {
         penerima_id: updated.input_aspirasi.siswa_id,
         jenis: 'success',
-        pesan: `Aspirasi Anda disetujui: ${updated.input_aspirasi.judul}`,
+        pesan: messageSiswa,
         aspirasi_id: aspirasiId
       }
     })
+    await triggerRealtimeNotification(updated.input_aspirasi.siswa_id, messageSiswa)
     
-    const adminId = await getAdminId()
-    if (adminId) {
+    const admins = await prisma.user.findMany({ where: { role: 'admin' } })
+    for (const admin of admins) {
+      const messageAdmin = `Aspirasi disetujui Yayasan, siap dikerjakan: ${updated.input_aspirasi.judul}`
       await prisma.notifikasi.create({
         data: {
-          penerima_id: adminId,
+          penerima_id: admin.id,
           jenis: 'success',
-          pesan: `Aspirasi disetujui Yayasan, siap dikerjakan: ${updated.input_aspirasi.judul}`,
+          pesan: messageAdmin,
           aspirasi_id: aspirasiId
         }
       })
+      await triggerRealtimeNotification(admin.id, messageAdmin)
     }
   } else if (status === 'ditolak') {
     // Admin/Yayasan -> Siswa
+    const message = `Aspirasi ditolak: ${updated.input_aspirasi.judul}. Catatan: ${catatan}`
     await prisma.notifikasi.create({
       data: {
         penerima_id: updated.input_aspirasi.siswa_id,
         jenis: 'error',
-        pesan: `Aspirasi ditolak: ${updated.input_aspirasi.judul}. Catatan: ${catatan}`,
+        pesan: message,
         aspirasi_id: aspirasiId
       }
     })
+    await triggerRealtimeNotification(updated.input_aspirasi.siswa_id, message)
   }
 
   revalidatePath(`/dashboard/aspirasi/${aspirasiId}`)
@@ -194,12 +232,26 @@ export async function updateProgress(aspirasiId: number, status: string, userId:
   })
 
   // Notify Siswa
+  const message = `Update Progres (${status.replace('_', ' ')}): ${deskripsi}`
   await prisma.notifikasi.create({
     data: {
       penerima_id: updated.input_aspirasi.siswa_id,
       jenis: 'info',
-      pesan: `Update Progres (${status.replace('_', ' ')}): ${deskripsi}`,
+      pesan: message,
       aspirasi_id: aspirasiId
+    }
+  })
+  await triggerRealtimeNotification(updated.input_aspirasi.siswa_id, message)
+
+  revalidatePath(`/dashboard/aspirasi/${aspirasiId}`)
+}
+
+export async function submitFeedback(aspirasiId: number, rating: number, feedback: string) {
+  await prisma.aspirasi.update({
+    where: { id: aspirasiId },
+    data: {
+      rating,
+      feedback
     }
   })
 
@@ -236,6 +288,49 @@ export async function createUser(formData: FormData) {
   redirect('/dashboard/users')
 }
 
+export async function updateAdmin(id: number, formData: FormData) {
+  const nama = formData.get('nama') as string
+  const username = formData.get('username') as string
+  const password = formData.get('password') as string
+
+  const data: any = {
+    nama,
+    username,
+  }
+
+  if (password && password.trim() !== '') {
+    data.password = await hash(password, 10)
+  }
+
+  await prisma.user.update({
+    where: { id },
+    data
+  })
+
+  revalidatePath('/dashboard/admins')
+  redirect('/dashboard/admins')
+}
+
+export async function createAdmin(formData: FormData) {
+  const nama = formData.get('nama') as string
+  const username = formData.get('username') as string
+  const password = formData.get('password') as string
+
+  const hashedPassword = await hash(password, 10)
+
+  await prisma.user.create({
+    data: {
+      nama,
+      username,
+      password: hashedPassword,
+      role: 'admin'
+    }
+  })
+
+  revalidatePath('/dashboard/admins')
+  redirect('/dashboard/admins')
+}
+
 export async function markNotificationRead(id: number) {
   await prisma.notifikasi.update({
     where: { id },
@@ -264,6 +359,17 @@ export async function deleteUser(id: number) {
   }
   
   revalidatePath('/dashboard/users')
+}
+
+export async function deleteAdmin(id: number) {
+  try {
+    await prisma.user.delete({
+      where: { id }
+    })
+  } catch (error) {
+    console.error("Error deleting admin:", error)
+  }
+  revalidatePath('/dashboard/admins')
 }
 
 export async function updateUser(id: number, formData: FormData) {

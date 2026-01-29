@@ -13,10 +13,13 @@ export default async function CreateUserPage() {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="text-3xl font-bold text-white mb-6">
-        Tambah Siswa Baru
-      </h1>
-      <div className="glass-card p-8 rounded-xl border border-slate-700/50 max-w-3xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-white tracking-tight">
+          Tambah Siswa Baru
+        </h1>
+        <p className="text-slate-400 mt-1">Buat akun siswa baru untuk mengakses sistem.</p>
+      </div>
+      <div className="glass-panel p-8 rounded-xl border border-white/5 max-w-3xl">
         <CreateUserForm />
       </div>
     </div>

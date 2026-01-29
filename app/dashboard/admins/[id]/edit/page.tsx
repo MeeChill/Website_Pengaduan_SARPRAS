@@ -2,22 +2,22 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
-import EditUserForm from "./form"
+import EditAdminForm from "./form"
 
-export default async function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditAdminPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   const user = session?.user as any
 
-  if (user.role !== 'admin') {
+  if (user.role !== 'yayasan') {
     redirect('/dashboard')
   }
 
   const { id } = await params
-  const student = await prisma.user.findUnique({
+  const admin = await prisma.user.findUnique({
     where: { id: parseInt(id) }
   })
 
-  if (!student || student.role !== 'siswa') {
+  if (!admin || admin.role !== 'admin') {
     notFound()
   }
 
@@ -25,12 +25,12 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
     <div className="animate-fade-in">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white tracking-tight">
-          Edit Data Siswa
+          Edit Data Admin
         </h1>
-        <p className="text-slate-400 mt-1">Perbarui informasi akun siswa.</p>
+        <p className="text-slate-400 mt-1">Perbarui informasi akun administrator.</p>
       </div>
       <div className="glass-panel p-8 rounded-xl border border-white/5 max-w-3xl">
-        <EditUserForm user={student} />
+        <EditAdminForm user={admin} />
       </div>
     </div>
   )

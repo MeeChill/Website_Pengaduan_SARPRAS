@@ -1,6 +1,6 @@
 'use client'
 
-import { updateUser } from "@/app/actions"
+import { updateAdmin } from "@/app/actions"
 import { useFormStatus } from "react-dom"
 
 function SubmitButton() {
@@ -29,53 +29,29 @@ function SubmitButton() {
   )
 }
 
-export default function EditUserForm({ user }: { user: any }) {
+export default function EditAdminForm({ user }: { user: any }) {
   return (
-    <form action={updateUser.bind(null, user.id)} className="space-y-8">
+    <form action={updateAdmin.bind(null, user.id)} className="space-y-8">
       <div className="space-y-6">
         <div className="flex items-center gap-3 border-b border-white/5 pb-4">
            <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400 border border-amber-500/20">
              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
            </div>
            <div>
-             <h3 className="text-white font-bold">Identitas Siswa</h3>
-             <p className="text-xs text-slate-500">Ubah data pribadi siswa jika diperlukan.</p>
+             <h3 className="text-white font-bold">Identitas Admin</h3>
+             <p className="text-xs text-slate-500">Ubah data pribadi admin jika diperlukan.</p>
            </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="md:col-span-2">
-            <label className="block text-slate-400 text-xs font-bold mb-2 uppercase tracking-wider">Nama Lengkap</label>
-            <input 
-              type="text" 
-              name="nama" 
-              defaultValue={user.nama}
-              required 
-              className="modern-input"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-xs font-bold mb-2 uppercase tracking-wider">NISN</label>
-            <input 
-              type="text" 
-              name="nis" 
-              defaultValue={user.nisn}
-              required 
-              className="modern-input"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-xs font-bold mb-2 uppercase tracking-wider">Kelas</label>
-            <input 
-              type="text" 
-              name="kelas" 
-              defaultValue={user.kelas}
-              required 
-              className="modern-input"
-            />
-          </div>
+        <div>
+          <label className="block text-slate-400 text-xs font-bold mb-2 uppercase tracking-wider">Nama Lengkap</label>
+          <input 
+            type="text" 
+            name="nama" 
+            defaultValue={user.nama}
+            required 
+            className="modern-input"
+          />
         </div>
       </div>
 
@@ -86,7 +62,7 @@ export default function EditUserForm({ user }: { user: any }) {
            </div>
            <div>
              <h3 className="text-white font-bold">Kredensial Akun</h3>
-             <p className="text-xs text-slate-500">Kelola akses login siswa.</p>
+             <p className="text-xs text-slate-500">Kelola akses login admin.</p>
            </div>
         </div>
 

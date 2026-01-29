@@ -7,9 +7,12 @@ import ExportButtons from "./export-buttons"
 
 // Helper component for summary cards
 const SummaryCard = ({ title, value, color }: { title: string, value: number, color: string }) => (
-  <div className="glass-card p-6 rounded-xl border border-slate-700/50">
-    <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">{title}</p>
-    <p className={`text-3xl font-bold mt-2 ${color}`}>{value}</p>
+  <div className="glass-panel p-6 rounded-xl border border-white/5 relative overflow-hidden group">
+    <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity`}>
+       <div className={`w-16 h-16 rounded-full blur-xl ${color.replace('text-', 'bg-')}`}></div>
+    </div>
+    <p className="text-slate-400 text-sm font-medium uppercase tracking-wider relative z-10">{title}</p>
+    <p className={`text-3xl font-bold mt-2 relative z-10 ${color}`}>{value}</p>
   </div>
 )
 
@@ -88,10 +91,10 @@ export default async function RekapPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Laporan Eksekutif</h1>
-          <p className="text-slate-400 text-sm">Rekapitulasi kinerja dan statistik aspirasi ({filterLabel}).</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Laporan Eksekutif</h1>
+          <p className="text-slate-400 text-sm mt-1">Rekapitulasi kinerja dan statistik aspirasi ({filterLabel}).</p>
         </div>
         
         {user.role === 'yayasan' && (
@@ -100,28 +103,28 @@ export default async function RekapPage({ searchParams }: { searchParams: Promis
       </div>
 
       {/* Filter Buttons */}
-      <div className="glass-card p-4 rounded-xl border border-slate-700/50 flex space-x-2 overflow-x-auto">
+      <div className="glass-panel p-2 rounded-xl border border-white/5 flex space-x-1 overflow-x-auto w-fit">
         <Link 
           href="/dashboard/rekap?filter=today" 
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${currentFilter === 'today' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${currentFilter === 'today' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
         >
           Hari Ini
         </Link>
         <Link 
           href="/dashboard/rekap?filter=week" 
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${currentFilter === 'week' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${currentFilter === 'week' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
         >
           Minggu Ini
         </Link>
         <Link 
           href="/dashboard/rekap?filter=month" 
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${currentFilter === 'month' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${currentFilter === 'month' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
         >
           Bulan Ini
         </Link>
         <Link 
           href="/dashboard/rekap?filter=year" 
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${currentFilter === 'year' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${currentFilter === 'year' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
         >
           Tahun Ini
         </Link>
@@ -130,59 +133,59 @@ export default async function RekapPage({ searchParams }: { searchParams: Promis
       {/* Summary Widgets */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <SummaryCard title="Total Masuk" value={total} color="text-white" />
-        <SummaryCard title="Menunggu" value={pending} color="text-yellow-400" />
-        <SummaryCard title="Disetujui" value={approved} color="text-blue-400" />
+        <SummaryCard title="Menunggu" value={pending} color="text-amber-400" />
+        <SummaryCard title="Disetujui" value={approved} color="text-indigo-400" />
         <SummaryCard title="Ditolak" value={rejected} color="text-red-400" />
-        <SummaryCard title="Selesai" value={completed} color="text-green-400" />
+        <SummaryCard title="Selesai" value={completed} color="text-emerald-400" />
       </div>
 
       {/* Data Table */}
-      <div className="glass-card rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="glass-panel rounded-xl overflow-hidden border border-white/5">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left">
             <thead>
-              <tr className="bg-slate-800/50 text-slate-400 uppercase text-xs tracking-wider border-b border-slate-700/50">
-                <th className="px-6 py-4 font-semibold">Tanggal</th>
-                <th className="px-6 py-4 font-semibold">Judul</th>
-                <th className="px-6 py-4 font-semibold">Pelapor</th>
-                <th className="px-6 py-4 font-semibold">Kategori</th>
-                <th className="px-6 py-4 font-semibold">Validasi</th>
-                <th className="px-6 py-4 font-semibold">Progres</th>
+              <tr className="bg-white/5 text-slate-300 uppercase text-xs tracking-wider font-medium border-b border-white/5">
+                <th className="px-6 py-4">Tanggal</th>
+                <th className="px-6 py-4">Judul</th>
+                <th className="px-6 py-4">Pelapor</th>
+                <th className="px-6 py-4">Kategori</th>
+                <th className="px-6 py-4">Validasi</th>
+                <th className="px-6 py-4">Progres</th>
               </tr>
             </thead>
-            <tbody className="text-slate-300 text-sm divide-y divide-slate-700/50">
+            <tbody className="text-slate-300 text-sm divide-y divide-white/5">
               {data.map((item: any) => (
-                <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-slate-400">
+                <tr key={item.id} className="hover:bg-white/5 transition-colors group">
+                  <td className="px-6 py-4 whitespace-nowrap text-slate-400 font-mono">
                     {new Date(item.input_aspirasi.tanggal_input).toLocaleDateString('id-ID')}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-200">
+                  <td className="px-6 py-4 font-medium text-white group-hover:text-indigo-300 transition-colors">
                     {item.input_aspirasi.judul}
                   </td>
                   <td className="px-6 py-4 text-slate-400">
                     {item.input_aspirasi.siswa.nama}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs">
+                    <span className="px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs">
                       {item.input_aspirasi.kategori.nama_kategori}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                      item.status_validasi === 'disetujui' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                      item.status_validasi === 'ditolak' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                      'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                      item.status_validasi === 'disetujui' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                      item.status_validasi === 'ditolak' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                      'bg-amber-500/10 text-amber-400 border-amber-500/20'
                     }`}>
-                      {item.status_validasi}
+                      {item.status_validasi.charAt(0).toUpperCase() + item.status_validasi.slice(1)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                      item.status_progres === 'selesai' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                      item.status_progres === 'dalam_progres' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
-                      'text-slate-500'
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                      item.status_progres === 'selesai' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                      item.status_progres === 'dalam_progres' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
+                      'text-slate-500 border-transparent'
                     }`}>
-                      {item.status_progres.replace('_', ' ')}
+                      {item.status_progres.replace('_', ' ').charAt(0).toUpperCase() + item.status_progres.replace('_', ' ').slice(1)}
                     </span>
                   </td>
                 </tr>

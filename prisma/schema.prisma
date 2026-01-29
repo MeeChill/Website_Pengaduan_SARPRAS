@@ -69,6 +69,7 @@ model Aspirasi {
   admin_id          Int?
   tanggal_mulai     DateTime?
   status_progres    String    @default("belum_dimulai") // enum: belum_dimulai, dalam_progres, selesai
+  rating            Int?      // Rating 1-5 dari siswa
   feedback          String?
   tanggal_selesai   DateTime?
 
