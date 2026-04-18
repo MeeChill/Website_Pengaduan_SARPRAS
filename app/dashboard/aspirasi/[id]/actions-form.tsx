@@ -6,16 +6,20 @@ import ConfirmModal from "./confirm-modal"
 
 export default function ActionsForm({ aspirasi, userId, userRole }: { aspirasi: any, userId: number, userRole: string }) {
   const [catatan, setCatatan] = useState('')
+  const [tenggatWaktu, setTenggatWaktu] = useState('')
   const [deskripsiUpdate, setDeskripsiUpdate] = useState('')
+  const [deskripsiSingkat, setDeskripsiSingkat] = useState('')
+  const [fotoAfter, setFotoAfter] = useState<File | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [pendingAction, setPendingAction] = useState<{status: string, desc: string} | null>(null)
+  const [pendingAction, setPendingAction] = useState<{status: string} | null>(null)
 
   const handleUpdateClick = (status: string) => {
-    setPendingAction({
-      status,
-      desc: deskripsiUpdate || (status === 'dalam_progres' ? 'Update pengerjaan' : 'Pengerjaan selesai')
-    })
+    if (status === 'selesai' && !fotoAfter) {
+      alert('Wajib upload foto bukti pengerjaan selesai!')
+      return
+    }
+    setPendingAction({ status })
     setShowConfirm(true)
   }
 
@@ -23,10 +27,22 @@ export default function ActionsForm({ aspirasi, userId, userRole }: { aspirasi: 
     if (pendingAction && !loading) {
       setLoading(true)
       try {
-        await updateProgress(aspirasi.id, pendingAction.status, userId, pendingAction.desc)
+        const formData = new FormData()
+        formData.append('aspirasiId', aspirasi.id.toString())
+        formData.append('status', pendingAction.status)
+        formData.append('userId', userId.toString())
+        formData.append('deskripsiUpdate', deskripsiUpdate || (pendingAction.status === 'dalam_progres' ? 'Update pengerjaan' : 'Pengerjaan selesai'))
+        formData.append('deskripsiSingkat', deskripsiSingkat)
+        if (fotoAfter) {
+          formData.append('fotoAfter', fotoAfter)
+        }
+
+        await updateProgress(formData)
         setShowConfirm(false)
         setPendingAction(null)
         setDeskripsiUpdate('')
+        setDeskripsiSingkat('')
+        setFotoAfter(null)
       } finally {
         setLoading(false)
       }
@@ -81,6 +97,16 @@ export default function ActionsForm({ aspirasi, userId, userRole }: { aspirasi: 
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
             Validasi Yayasan
           </h3>
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tenggat Waktu Pengerjaan</label>
+            <input 
+              type="date" 
+              className="modern-input text-sm"
+              value={tenggatWaktu}
+              onChange={(e) => setTenggatWaktu(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+            />
+          </div>
           <textarea
             placeholder="Catatan validasi..."
             className="modern-input mb-4 h-24 text-sm resize-none"
@@ -89,7 +115,7 @@ export default function ActionsForm({ aspirasi, userId, userRole }: { aspirasi: 
           ></textarea>
           <div className="flex gap-3">
             <button
-              onClick={() => updateValidation(aspirasi.id, 'disetujui', userId, catatan)}
+              onClick={() => updateValidation(aspirasi.id, 'disetujui', userId, catatan, tenggatWaktu)}
               className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2.5 px-4 rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
             >
               Setujui Laporan
@@ -125,12 +151,40 @@ export default function ActionsForm({ aspirasi, userId, userRole }: { aspirasi: 
              </div>
           ) : (
             <>
-              <textarea
-                placeholder="Deskripsikan perkembangan pengerjaan..."
-                className="modern-input mb-4 h-24 text-sm resize-none"
-                value={deskripsiUpdate}
-                onChange={(e) => setDeskripsiUpdate(e.target.value)}
-              ></textarea>
+              <div className="space-y-4 mb-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Detail untuk Yayasan</label>
+                  <textarea
+                    placeholder="Deskripsikan perkembangan pengerjaan secara detail..."
+                    className="modern-input h-24 text-sm resize-none"
+                    value={deskripsiUpdate}
+                    onChange={(e) => setDeskripsiUpdate(e.target.value)}
+                  ></textarea>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ringkasan untuk Siswa (Opsional)</label>
+                  <input
+                    type="text"
+                    placeholder="Jika diisi, ini yang akan muncul di dashboard siswa..."
+                    className="modern-input text-sm"
+                    value={deskripsiSingkat}
+                    onChange={(e) => setDeskripsiSingkat(e.target.value)}
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1 italic">*Kosongkan jika update ini hanya untuk konsumsi internal (Yayasan).</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Foto Bukti Selesai (Wajib jika selesai)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="modern-input text-sm file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500"
+                    onChange={(e) => setFotoAfter(e.target.files?.[0] || null)}
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => handleUpdateClick('dalam_progres')}

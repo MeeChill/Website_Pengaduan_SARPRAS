@@ -72,6 +72,8 @@ model Aspirasi {
   rating            Int?      // Rating 1-5 dari siswa
   feedback          String?
   tanggal_selesai   DateTime?
+  tenggat_waktu     DateTime?
+  foto_after        String?
 
   // Relations
   input_aspirasi    InputAspirasi   @relation(fields: [input_aspirasi_id], references: [id])
@@ -84,11 +86,12 @@ model Aspirasi {
 }
 
 model ProgresUpdate {
-  id               Int      @id @default(autoincrement())
-  aspirasi_id      Int
-  admin_id         Int
-  deskripsi_update String
-  tanggal_update   DateTime @default(now())
+  id                Int      @id @default(autoincrement())
+  aspirasi_id       Int
+  admin_id          Int
+  deskripsi_update  String   // Deskripsi detail untuk Yayasan
+  deskripsi_singkat String?  // Deskripsi simpel untuk Siswa
+  tanggal_update    DateTime @default(now())
 
   // Relations
   aspirasi         Aspirasi @relation(fields: [aspirasi_id], references: [id])

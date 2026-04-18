@@ -156,12 +156,13 @@ const SiswaDashboard = ({ stats, user, feed }: { stats: any, user: any, feed: an
                     </p>
                   </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${
+                  item.status_validasi === 'ditolak' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
                   item.status_progres === 'selesai' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                  item.status_progres === 'dalam_progres' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
+                  item.status_progres === 'dalam_progres' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
                   'bg-slate-700/50 text-slate-400 border-slate-600'
                 }`}>
-                  {item.status_progres.replace('_', ' ')}
+                  {item.status_validasi === 'ditolak' ? 'Dibatalkan' : item.status_progres.replace('_', ' ')}
                 </span>
               </div>
               <p className="text-slate-300 line-clamp-2 mb-4 pl-14">{item.input_aspirasi.deskripsi}</p>

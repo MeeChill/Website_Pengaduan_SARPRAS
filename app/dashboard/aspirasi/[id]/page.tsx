@@ -107,7 +107,7 @@ export default async function AspirasiDetailPage({ params }: { params: Promise<{
             <svg className="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             Status Laporan
           </h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700/50">
               <p className="text-xs text-slate-500 uppercase tracking-wider mb-1 font-semibold">Validasi Admin</p>
               <p className={`font-bold capitalize ${
@@ -125,23 +125,49 @@ export default async function AspirasiDetailPage({ params }: { params: Promise<{
             <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700/50">
               <p className="text-xs text-slate-500 uppercase tracking-wider mb-1 font-semibold">Progres Pengerjaan</p>
               <p className={`font-bold capitalize ${
-                aspirasi.status_progres === 'selesai' ? 'text-blue-400' :
-                aspirasi.status_progres === 'dalam_progres' ? 'text-cyan-400' : 'text-slate-400'
+                aspirasi.status_validasi === 'ditolak' ? 'text-slate-500' :
+                aspirasi.status_progres === 'selesai' ? 'text-emerald-400' :
+                aspirasi.status_progres === 'dalam_progres' ? 'text-blue-400' : 'text-slate-400'
               }`}>
-                {aspirasi.status_progres.replace('_', ' ')}
+                {aspirasi.status_validasi === 'ditolak' ? 'Pengerjaan Dibatalkan' : aspirasi.status_progres.replace('_', ' ')}
               </p>
+              {aspirasi.tenggat_waktu && aspirasi.status_progres !== 'selesai' && (
+                <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  Tenggat: {aspirasi.tenggat_waktu.toLocaleDateString('id-ID')}
+                </p>
+              )}
             </div>
           </div>
+          
+          {aspirasi.status_progres === 'selesai' && aspirasi.foto_after && (
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Foto Sebelum</p>
+                <div className="rounded-lg overflow-hidden border border-slate-700 bg-slate-900 h-32">
+                  <img src={aspirasi.input_aspirasi.foto} alt="Before" className="w-full h-full object-cover" />
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Foto Sesudah</p>
+                <div className="rounded-lg overflow-hidden border border-emerald-500/30 bg-slate-900 h-32">
+                  <img src={aspirasi.foto_after} alt="After" className="w-full h-full object-cover" />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* History Updates */}
         <div className="glass-panel p-6 rounded-xl border border-white/5">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center">
              <svg className="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-             Riwayat Progres
+             {user.role === 'siswa' ? 'Progres Penting' : 'Riwayat Progres'}
           </h2>
           <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-700 before:to-transparent">
-            {aspirasi.progres_updates.map((update: any) => (
+            {aspirasi.progres_updates
+              .filter((update: any) => user.role !== 'siswa' || update.deskripsi_singkat)
+              .map((update: any) => (
               <div key={update.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                 <div className="flex items-center justify-center w-10 h-10 rounded-full border border-slate-700 bg-slate-800 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 text-indigo-400">
                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
@@ -149,16 +175,20 @@ export default async function AspirasiDetailPage({ params }: { params: Promise<{
                 <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-slate-800/30 p-4 rounded-xl border border-slate-700/50 shadow-sm">
                   <div className="flex items-center justify-between space-x-2 mb-1">
                     <div className="font-bold text-slate-200 text-sm">Update Petugas</div>
-                    <time className="font-mono text-xs text-slate-500">{update.tanggal_update.toLocaleString()}</time>
+                    <time className="font-mono text-[10px] text-slate-500">{update.tanggal_update.toLocaleString('id-ID')}</time>
                   </div>
-                  <div className="text-slate-400 text-sm">{update.deskripsi_update}</div>
-                  <div className="mt-2 text-xs text-indigo-400 font-medium">Oleh: {update.admin.nama}</div>
+                  <div className="text-slate-300 text-sm">
+                    {user.role === 'siswa' ? update.deskripsi_singkat : update.deskripsi_update}
+                  </div>
+                  <div className="mt-2 text-[10px] text-indigo-400 font-medium">Oleh: {update.admin.nama}</div>
                 </div>
               </div>
             ))}
-            {aspirasi.progres_updates.length === 0 && (
+            {(user.role === 'siswa' ? 
+               aspirasi.progres_updates.filter((u: any) => u.deskripsi_singkat).length === 0 : 
+               aspirasi.progres_updates.length === 0) && (
               <div className="text-center py-8 text-slate-500 italic bg-slate-800/20 rounded-xl border border-white/5 border-dashed">
-                Belum ada riwayat update pengerjaan.
+                {user.role === 'siswa' ? 'Belum ada informasi progres terbaru untuk Anda.' : 'Belum ada riwayat update pengerjaan.'}
               </div>
             )}
           </div>

@@ -8,6 +8,7 @@ import { join } from "path"
 import { hash } from "bcryptjs"
 import { pusherServer } from '@/lib/pusher'
 import { resend } from '@/lib/resend'
+import sharp from "sharp"
 
 // --- Helpers for Real-time & Email ---
 async function triggerRealtimeNotification(userId: number, message: string) {
@@ -47,6 +48,14 @@ async function getYayasanId() {
   return yayasan?.id
 }
 
+// --- Helper for Image Compression ---
+async function compressImage(buffer: Buffer): Promise<Buffer> {
+  return await sharp(buffer)
+    .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true }) // Resize if larger than 1200px
+    .jpeg({ quality: 80 }) // Compress to JPEG with 80% quality
+    .toBuffer()
+}
+
 export async function createAspirasi(formData: FormData) {
   // Check limit
   const count = await prisma.inputAspirasi.count()
@@ -68,21 +77,8 @@ export async function createAspirasi(formData: FormData) {
     const bytes = await fotoFile.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    // Using /tmp directory for Vercel (serverless environment)
-    // Note: In production Vercel, this file will disappear after the function finishes.
-    // For persistent storage, use AWS S3, Cloudinary, or Vercel Blob.
-    // But for this school project, we will try to write to /tmp and see if we can serve it, 
-    // OR we just convert to Base64 to store in DB (not recommended for large files but works for small demo).
-    
-    // BETTER APPROACH FOR VERCEL DEMO WITHOUT EXTERNAL STORAGE:
-    // We can't easily serve static files from /tmp in Next.js App Router on Vercel.
-    // So we will skip saving to disk and just not support image persistence in this specific Vercel deployment 
-    // unless we use an external service.
-    
-    // HOWEVER, to fix the crash "EROFS: read-only file system", we must stop writing to public/uploads.
-    
-    // For this specific error fix, let's just log it and NOT write the file if we are in production/vercel.
-    // Or write to /tmp just to process it (but it won't be served).
+    // Compress the image
+    const compressedBuffer = await compressImage(buffer)
     
     if (process.env.VERCEL) {
         // In Vercel, we can't write to public/uploads. 
@@ -93,10 +89,11 @@ export async function createAspirasi(formData: FormData) {
         const uploadDir = join(process.cwd(), 'public/uploads')
         await mkdir(uploadDir, { recursive: true })
 
-        const filename = `${Date.now()}-${fotoFile.name.replace(/\s/g, '-')}`
+        // Always save as .jpg since we compressed to JPEG
+        const filename = `${Date.now()}-${fotoFile.name.replace(/\.[^/.]+$/, "").replace(/\s/g, '-')}.jpg`
         const filepath = join(uploadDir, filename)
 
-        await writeFile(filepath, buffer)
+        await writeFile(filepath, compressedBuffer)
         fotoUrl = `/uploads/${filename}`
     }
   }
@@ -140,7 +137,7 @@ export async function createAspirasi(formData: FormData) {
   redirect('/dashboard/aspirasi')
 }
 
-export async function updateValidation(aspirasiId: number, status: string, userId: number, catatan: string) {
+export async function updateValidation(aspirasiId: number, status: string, userId: number, catatan: string, tenggatWaktu?: string) {
   const updated = await prisma.aspirasi.update({
     where: { id: aspirasiId },
     data: {
@@ -148,6 +145,7 @@ export async function updateValidation(aspirasiId: number, status: string, userI
       validasi_oleh: userId,
       tanggal_validasi: new Date(),
       catatan_validasi: catatan,
+      tenggat_waktu: tenggatWaktu ? new Date(tenggatWaktu) : undefined,
     },
     include: { input_aspirasi: true }
   })
@@ -170,7 +168,7 @@ export async function updateValidation(aspirasiId: number, status: string, userI
     }
   } else if (status === 'disetujui') {
     // Yayasan -> Siswa & Admin
-    const messageSiswa = `Aspirasi Anda disetujui: ${updated.input_aspirasi.judul}`
+    const messageSiswa = `Aspirasi Anda disetujui: ${updated.input_aspirasi.judul}${tenggatWaktu ? `. Target selesai: ${new Date(tenggatWaktu).toLocaleDateString('id-ID')}` : ''}`
     await prisma.notifikasi.create({
       data: {
         penerima_id: updated.input_aspirasi.siswa_id,
@@ -183,7 +181,7 @@ export async function updateValidation(aspirasiId: number, status: string, userI
     
     const admins = await prisma.user.findMany({ where: { role: 'admin' } })
     for (const admin of admins) {
-      const messageAdmin = `Aspirasi disetujui Yayasan, siap dikerjakan: ${updated.input_aspirasi.judul}`
+      const messageAdmin = `Aspirasi disetujui Yayasan, siap dikerjakan: ${updated.input_aspirasi.judul}${tenggatWaktu ? `. Tenggat: ${new Date(tenggatWaktu).toLocaleDateString('id-ID')}` : ''}`
       await prisma.notifikasi.create({
         data: {
           penerima_id: admin.id,
@@ -211,7 +209,39 @@ export async function updateValidation(aspirasiId: number, status: string, userI
   revalidatePath(`/dashboard/aspirasi/${aspirasiId}`)
 }
 
-export async function updateProgress(aspirasiId: number, status: string, userId: number, deskripsi: string) {
+export async function updateProgress(formData: FormData) {
+  const aspirasiId = parseInt(formData.get('aspirasiId') as string)
+  const status = formData.get('status') as string
+  const userId = parseInt(formData.get('userId') as string)
+  const deskripsiUpdate = formData.get('deskripsiUpdate') as string // Detail for Yayasan
+  const deskripsiSingkat = formData.get('deskripsiSingkat') as string // Simple for User
+  
+  // Handle Photo After Upload (only when status is 'selesai')
+  const fotoAfterFile = formData.get('fotoAfter') as File | null
+  let fotoAfterUrl = null
+
+  if (status === 'selesai' && fotoAfterFile && fotoAfterFile.size > 0) {
+    const bytes = await fotoAfterFile.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    // Compress the image
+    const compressedBuffer = await compressImage(buffer)
+
+    if (process.env.VERCEL) {
+        console.log("Skipping file upload in Vercel environment.")
+    } else {
+        const uploadDir = join(process.cwd(), 'public/uploads')
+        await mkdir(uploadDir, { recursive: true })
+
+        // Always save as .jpg since we compressed to JPEG
+        const filename = `${Date.now()}-after-${fotoAfterFile.name.replace(/\.[^/.]+$/, "").replace(/\s/g, '-')}.jpg`
+        const filepath = join(uploadDir, filename)
+
+        await writeFile(filepath, compressedBuffer)
+        fotoAfterUrl = `/uploads/${filename}`
+    }
+  }
+
   const updated = await prisma.aspirasi.update({
     where: { id: aspirasiId },
     data: {
@@ -219,6 +249,7 @@ export async function updateProgress(aspirasiId: number, status: string, userId:
       admin_id: userId,
       tanggal_mulai: status === 'dalam_progres' ? new Date() : undefined,
       tanggal_selesai: status === 'selesai' ? new Date() : undefined,
+      foto_after: fotoAfterUrl || undefined,
     },
     include: { input_aspirasi: true }
   })
@@ -227,12 +258,13 @@ export async function updateProgress(aspirasiId: number, status: string, userId:
     data: {
       aspirasi_id: aspirasiId,
       admin_id: userId,
-      deskripsi_update: deskripsi,
+      deskripsi_update: deskripsiUpdate,
+      deskripsi_singkat: deskripsiSingkat,
     }
   })
 
-  // Notify Siswa
-  const message = `Update Progres (${status.replace('_', ' ')}): ${deskripsi}`
+  // Notify Siswa - use deskripsiSingkat if available, otherwise deskripsiUpdate
+  const message = `Update Progres (${status.replace('_', ' ')}): ${deskripsiSingkat || deskripsiUpdate}`
   await prisma.notifikasi.create({
     data: {
       penerima_id: updated.input_aspirasi.siswa_id,
