@@ -145,13 +145,13 @@ export default async function AspirasiDetailPage({ params }: { params: Promise<{
               <div>
                 <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Foto Sebelum</p>
                 <div className="rounded-lg overflow-hidden border border-slate-700 bg-slate-900 h-32">
-                  <img src={aspirasi.input_aspirasi.foto} alt="Before" className="w-full h-full object-cover" />
+                  <img src={aspirasi.input_aspirasi.foto || '/placeholder-image.jpg'} alt="Before" className="w-full h-full object-cover" />
                 </div>
               </div>
               <div>
                 <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Foto Sesudah</p>
                 <div className="rounded-lg overflow-hidden border border-emerald-500/30 bg-slate-900 h-32">
-                  <img src={aspirasi.foto_after} alt="After" className="w-full h-full object-cover" />
+                  <img src={aspirasi.foto_after || '/placeholder-image.jpg'} alt="After" className="w-full h-full object-cover" />
                 </div>
               </div>
             </div>
