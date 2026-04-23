@@ -30,6 +30,11 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // Validate role is either 'user' or 'admin' (simplified from siswa/admin/yayasan)
+        if (!['user', 'admin'].includes(user.role)) {
+          return null
+        }
+
         return {
           id: user.id.toString(),
           name: user.nama,

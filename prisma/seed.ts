@@ -26,27 +26,42 @@ async function main() {
   
   // Admin
   await prisma.user.upsert({
-    where: { username: 'siswa' },
+    where: { username: 'admin' },
+    update: {},
+    create: {
+      nama: 'Administrator',
+      username: 'admin',
+      password: passwordHash,
+      role: 'admin',
+    },
+  })
+
+
+  // User (NIPD)
+  await prisma.user.upsert({
+    where: { username: '123456' },
     update: {},
     create: {
       nama: 'Budi Santoso',
-      username: 'siswa',
+      username: '123456', // Menggunakan NIPD sebagai username
       password: passwordHash,
-      role: 'siswa',
-      nisn: '1234567890',
+      role: 'user',
+      nisn: '123456',
       kelas: 'XII RPL 1',
     },
   })
 
-  // Yayasan
+  // User 2 (NIPD)
   await prisma.user.upsert({
-    where: { username: 'yayasan' },
+    where: { username: '654321' },
     update: {},
     create: {
-      nama: 'Ketua Yayasan',
-      username: 'yayasan',
+      nama: 'Siti Aminah',
+      username: '654321', // Menggunakan NIPD sebagai username
       password: passwordHash,
-      role: 'yayasan',
+      role: 'user',
+      nisn: '654321',
+      kelas: 'XI TKJ 2',
     },
   })
 

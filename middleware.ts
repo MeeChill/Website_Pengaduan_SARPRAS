@@ -9,7 +9,10 @@ export default withAuth(
 
     if (isLoginPage) {
       if (isAuth) {
-        return NextResponse.redirect(new URL('/dashboard', req.url))
+        if (token.role === 'admin') {
+          return NextResponse.redirect(new URL('/admin', req.url))
+        }
+        return NextResponse.redirect(new URL('/chat', req.url))
       }
       return null
     }
@@ -17,14 +20,23 @@ export default withAuth(
     if (!isAuth) {
       return NextResponse.redirect(new URL('/login', req.url))
     }
+
+    if (req.nextUrl.pathname.startsWith('/admin') && token.role !== 'admin') {
+      return NextResponse.redirect(new URL('/', req.url))
+    }
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ req, token }) => {
+        if (req.nextUrl.pathname.startsWith('/login')) {
+          return true
+        }
+        return !!token
+      }
     },
   }
 )
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/aspirasi/:path*"],
+  matcher: ["/admin/:path*", "/login", "/chat"],
 }

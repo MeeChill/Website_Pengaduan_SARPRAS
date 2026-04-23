@@ -12,6 +12,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+import { Providers } from "@/components/Providers";
+
 export const metadata: Metadata = {
   title: "NEO-SARANA | Sistem Pengaduan Sekolah",
   description: "Platform pengaduan dan aspirasi sekolah terintegrasi.",
@@ -28,8 +30,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
 }
+
