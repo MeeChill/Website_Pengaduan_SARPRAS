@@ -72,7 +72,7 @@ export default function ComplaintsManagement() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
-      <div className="max-w-7xl mx-auto px-6 py-8 animate-fade-in">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 animate-fade-in">
         {/* Header with back button */}
         <div className="mb-8">
           <Link
@@ -83,14 +83,14 @@ export default function ComplaintsManagement() {
             <span className="font-semibold">Kembali ke Dashboard</span>
           </Link>
 
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900 p-8 border border-white/10 shadow-2xl">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900 p-5 sm:p-8 border border-white/10 shadow-2xl">
             <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-indigo-500/10 blur-3xl animate-pulse-glow"></div>
             <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 rounded-full bg-purple-500/10 blur-3xl animate-pulse-glow delay-1000"></div>
             <div className="relative z-10">
-              <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 tracking-tight mb-2">
+              <h1 className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 tracking-tight mb-2">
                 Manajemen Pengaduan
               </h1>
-              <p className="text-indigo-200/80 text-lg font-medium">
+              <p className="text-indigo-200/80 text-sm sm:text-lg font-medium">
                 Kelola, pantau, dan selesaikan semua pengaduan dengan efisien.
               </p>
             </div>
@@ -132,8 +132,8 @@ export default function ComplaintsManagement() {
           className="glass-panel rounded-2xl border border-white/5 overflow-hidden shadow-2xl animate-slide-up"
           style={{ animationDelay: "0.3s" }}
         >
-          <div className="overflow-x-auto min-w-full">
-            <table className="w-full">
+          <div className="hidden md:block overflow-x-auto min-w-full">
+            <table className="w-full min-w-[980px]">
               <thead className="bg-slate-900/80 border-b border-white/10 backdrop-blur-xl">
                 <tr>
                   <th className="text-left p-5 text-indigo-300 font-bold uppercase tracking-wider text-xs whitespace-nowrap">
@@ -236,6 +236,51 @@ export default function ComplaintsManagement() {
                 </p>
               </div>
             )}
+          </div>
+          <div className="md:hidden p-3 space-y-3">
+            {filteredAspirasi.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 text-center animate-fade-in">
+                <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
+                  <Search className="w-7 h-7 text-slate-500" />
+                </div>
+                <p className="text-base font-bold text-white mb-1">
+                  Tidak ada pengaduan ditemukan
+                </p>
+                <p className="text-slate-400 text-sm">
+                  Ubah filter atau kata kunci pencarian.
+                </p>
+              </div>
+            )}
+            {filteredAspirasi.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-xl border border-white/10 bg-slate-900/50 p-4 space-y-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="inline-flex items-center font-mono text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded-lg border border-indigo-500/20">
+                    {item.nomor_tiket}
+                  </span>
+                  <ManagementStatusBadge status={item.status} />
+                </div>
+                <div>
+                  <p className="text-white font-semibold text-sm">{item.judul}</p>
+                  <p className="text-slate-400 text-xs mt-1 line-clamp-2">
+                    {item.deskripsi}
+                  </p>
+                </div>
+                <div className="text-xs text-slate-400 space-y-1">
+                  <p>📍 {item.lokasi}</p>
+                  <p>👤 {item.user.nama}</p>
+                </div>
+                <Link
+                  href={`/admin/management/${item.id}`}
+                  className="inline-flex items-center gap-2 bg-indigo-600/10 hover:bg-indigo-500 text-indigo-400 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold border border-indigo-500/20 hover:border-indigo-500 transition-all"
+                >
+                  <Eye className="w-4 h-4" />
+                  Kelola
+                </Link>
+              </div>
+            ))}
           </div>
         </div>
       </div>

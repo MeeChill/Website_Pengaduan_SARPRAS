@@ -50,29 +50,29 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex bg-slate-950 overflow-hidden">
       {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-16 lg:px-24 xl:px-32 relative z-10 bg-slate-950/80 backdrop-blur-xl border-r border-white/5">
+      <div className="w-full lg:w-1/2 flex flex-col justify-center px-4 sm:px-10 lg:px-24 xl:px-32 py-8 sm:py-10 relative z-10 bg-slate-950/80 backdrop-blur-xl border-r border-white/5">
         <div className="w-full max-w-md mx-auto animate-fade-in">
           
-          <Link href="/" className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-colors mb-12 group">
+          <Link href="/" className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-colors mb-8 sm:mb-12 group">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             <span className="text-sm font-medium">Kembali ke Beranda</span>
           </Link>
 
-          <div className="mb-10">
+          <div className="mb-7 sm:mb-10">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 mb-6 shadow-lg shadow-indigo-500/20 ring-1 ring-indigo-500/20">
               <ShieldCheck className="w-7 h-7" />
             </div>
-            <h1 className="text-4xl font-bold tracking-tight text-white mb-3">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-3">
               Selamat Datang
             </h1>
-            <p className="text-slate-400 text-lg">
+            <p className="text-slate-400 text-base sm:text-lg">
               Silakan masuk menggunakan NIPD Anda untuk mengakses layanan.
             </p>
           </div>
           
-          <div className="glass-panel p-8 rounded-3xl shadow-2xl backdrop-blur-xl border border-white/10 relative overflow-hidden">
+          <div className="glass-panel p-5 sm:p-8 rounded-3xl shadow-2xl backdrop-blur-xl border border-white/10 relative overflow-hidden">
             {/* Decorative background glow inside card */}
             <div className="absolute top-0 right-0 -mr-16 -mt-16 w-32 h-32 rounded-full bg-indigo-500/10 blur-2xl"></div>
             

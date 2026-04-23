@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -25,7 +25,19 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    const syncViewport = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setIsOpen(!mobile);
+    };
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
 
   const menuItems = [
     {
@@ -94,11 +106,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-slate-950">
+    <div className="flex h-screen bg-slate-950 overflow-hidden">
+      {isMobile && isOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-[1px]"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
       {/* Sidebar */}
       <motion.div
-        className={`${isOpen ? "w-72" : "w-24"} bg-gradient-to-b from-slate-900 to-slate-950 border-r border-white/10 transition-all duration-300 flex flex-col`}
-        animate={{ width: isOpen ? 288 : 96 }}
+        className={`${isMobile ? "fixed z-40 left-0 top-0 h-full" : "relative h-full"} ${isOpen ? "w-72" : "w-24"} bg-gradient-to-b from-slate-900 to-slate-950 border-r border-white/10 transition-all duration-300 flex flex-col`}
+        animate={
+          isMobile
+            ? { x: isOpen ? 0 : -288, width: 288 }
+            : { width: isOpen ? 288 : 96 }
+        }
         transition={{ duration: 0.3 }}
       >
         {/* Logo Area */}
@@ -119,7 +141,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             )}
           </motion.div>
           <button
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => setIsOpen((v) => !v)}
             className="p-1 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white"
           >
             {isOpen ? (
@@ -213,24 +235,31 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Main Content */}
       <motion.div
-        className="flex-1 flex flex-col overflow-hidden"
+        className="flex-1 flex flex-col overflow-hidden min-w-0"
         animate={{
           marginLeft: 0,
         }}
       >
         {/* Top Header */}
-        <div className="h-16 border-b border-white/10 bg-slate-900/50 backdrop-blur-sm flex items-center justify-between px-6">
+        <div className="h-16 border-b border-white/10 bg-slate-900/50 backdrop-blur-sm flex items-center justify-between px-3 sm:px-6 gap-2">
+          <button
+            onClick={() => setIsOpen((v) => !v)}
+            className="md:hidden p-2 rounded-lg hover:bg-white/10 text-slate-300"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <motion.h1
-            className="text-lg font-bold text-white"
+            className="text-sm sm:text-lg font-bold text-white truncate"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
           >
             {menuItems.find((item) => isActive(item.href))?.label ||
               "Admin Panel"}
           </motion.h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <NotificationBell role="admin" />
-            <div className="text-right">
+            <div className="text-right hidden sm:block">
               <p className="text-sm text-slate-300">Admin</p>
               <p className="text-xs text-slate-500">Sistem Pengaduan</p>
             </div>

@@ -362,13 +362,13 @@ export default function ManagementDetailPage() {
     <div className="min-h-screen bg-slate-950 text-slate-200 pb-16">
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
           <Link
             href="/admin/management"
             className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-colors group"
           >
             <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-semibold text-sm">Kembali ke Manajemen</span>
+            <span className="font-semibold text-xs sm:text-sm">Kembali ke Manajemen</span>
           </Link>
 
           <div className="flex items-center gap-3">
@@ -384,10 +384,10 @@ export default function ManagementDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 pt-8 space-y-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 space-y-6 sm:space-y-8">
 
         {/* ── Page header ───────────────────────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900/30 via-slate-900 to-slate-950 border border-white/8 p-8 shadow-2xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900/30 via-slate-900 to-slate-950 border border-white/8 p-5 sm:p-8 shadow-2xl">
           <div className="absolute top-0 right-0 -mr-20 -mt-20 w-72 h-72 rounded-full bg-indigo-500/8 blur-3xl pointer-events-none" />
           <div className="relative">
             <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -401,7 +401,7 @@ export default function ManagementDetailPage() {
                     {aspirasi.kategori.nama_kategori}
                   </span>
                 </div>
-                <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-snug mb-2">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight leading-snug mb-2">
                   {aspirasi.judul}
                 </h1>
                 <p className="text-slate-400 leading-relaxed max-w-2xl">
@@ -455,7 +455,7 @@ export default function ManagementDetailPage() {
                 <Tag className="w-4 h-4 text-indigo-400" />
                 Perbarui Status
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                 {STATUS_OPTIONS.map((opt) => {
                   const isActive = aspirasi.status === opt.key;
                   return (
@@ -529,7 +529,7 @@ export default function ManagementDetailPage() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                   {/* Attach photo */}
                   <input
                     ref={progressFileRef}
@@ -550,7 +550,7 @@ export default function ManagementDetailPage() {
                   <button
                     onClick={handleSubmitProgress}
                     disabled={!progressText.trim() || submittingProgress || uploadingProgressPhoto}
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed ml-auto"
+                    className="flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed sm:ml-auto"
                   >
                     {submittingProgress ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

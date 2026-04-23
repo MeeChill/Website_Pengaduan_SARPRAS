@@ -18,6 +18,7 @@ import {
   Bell,
   Star,
   ChevronDown,
+  Menu,
   Check,
   X,
   Clock,
@@ -189,7 +190,7 @@ function ChatMockup() {
       </div>
 
       {/* Floating notification */}
-      <div className="absolute -top-4 -right-4 bg-slate-800 border border-white/10 rounded-2xl px-3 py-2.5 shadow-xl animate-float">
+      <div className="hidden sm:block absolute -top-4 -right-4 bg-slate-800 border border-white/10 rounded-2xl px-3 py-2.5 shadow-xl animate-float">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
             <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -205,7 +206,7 @@ function ChatMockup() {
 
       {/* Floating ticket */}
       <div
-        className="absolute -bottom-3 -left-4 bg-slate-800 border border-indigo-500/20 rounded-2xl px-3 py-2 shadow-xl animate-float"
+        className="hidden sm:block absolute -bottom-3 -left-4 bg-slate-800 border border-indigo-500/20 rounded-2xl px-3 py-2 shadow-xl animate-float"
         style={{ animationDelay: "1s" }}
       >
         <p className="text-indigo-400 font-mono text-[9px] font-bold">
@@ -410,6 +411,7 @@ function Ticker() {
 export default function LandingPageClient({ isLoggedIn, userName }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [navScrolled, setNavScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Nav scroll effect
   useEffect(() => {
@@ -417,6 +419,18 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
   }, []);
+
+  useEffect(() => {
+    // Prevent background scroll when mobile menu is open.
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
 
   // GSAP animations
   useEffect(() => {
@@ -695,7 +709,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       <nav
         className={`nav-anim fixed top-0 w-full z-50 transition-all duration-300 ${navScrolled ? "border-b border-white/8 bg-slate-950/90 backdrop-blur-xl shadow-lg shadow-black/20" : "border-b border-white/5 bg-slate-950/60 backdrop-blur-xl"}`}
       >
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-3">
           {/* Logo */}
           <div className="flex items-center gap-3 group cursor-pointer">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:scale-110 transition-transform duration-300">
@@ -713,7 +727,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
                 />
               </svg>
             </div>
-            <span className="text-xl font-black tracking-tighter text-white uppercase group-hover:text-indigo-400 transition-colors duration-300">
+            <span className="text-base sm:text-xl font-black tracking-tighter text-white uppercase group-hover:text-indigo-400 transition-colors duration-300">
               NEO<span className="text-indigo-500">-</span>SARANA
             </span>
           </div>
@@ -738,7 +752,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
           </div>
 
           {/* Auth */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {isLoggedIn ? (
               <>
                 {userName && (
@@ -749,13 +763,13 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
                 )}
                 <Link
                   href="/chat"
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-all hover:scale-105 active:scale-95 text-sm"
+                  className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-all hover:scale-105 active:scale-95 text-xs sm:text-sm"
                 >
                   Buka Chat
                 </Link>
                 <Link
                   href="/api/auth/signout"
-                  className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-semibold transition-all text-sm"
+                  className="hidden sm:inline-flex px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-semibold transition-all text-sm"
                 >
                   Logout
                 </Link>
@@ -770,18 +784,85 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
                 </Link>
                 <Link
                   href="/login"
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/20 transition-all hover:scale-105 active:scale-95 text-sm"
+                  className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/20 transition-all hover:scale-105 active:scale-95 text-xs sm:text-sm"
                 >
                   Login NIPD
                 </Link>
               </>
             )}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              className="md:hidden w-10 h-10 rounded-xl border border-white/10 bg-white/5 text-slate-200 flex items-center justify-center"
+              aria-label={mobileMenuOpen ? "Tutup menu" : "Buka menu"}
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
+            </button>
           </div>
         </div>
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-white/10 bg-slate-950/95 backdrop-blur-xl">
+            <div className="px-4 py-4 flex flex-col gap-1 text-sm text-slate-300">
+              <a
+                href="#features"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2.5 rounded-lg hover:bg-white/5"
+              >
+                Fitur
+              </a>
+              <a
+                href="#how"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2.5 rounded-lg hover:bg-white/5"
+              >
+                Cara Kerja
+              </a>
+              <a
+                href="#categories"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2.5 rounded-lg hover:bg-white/5"
+              >
+                Kategori
+              </a>
+              <a
+                href="#faq"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2.5 rounded-lg hover:bg-white/5"
+              >
+                FAQ
+              </a>
+              <div className="mt-2 pt-3 border-t border-white/10 flex gap-2">
+                {!isLoggedIn && (
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-center"
+                  >
+                    Masuk
+                  </Link>
+                )}
+                {isLoggedIn && (
+                  <Link
+                    href="/api/auth/signout"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-center"
+                  >
+                    Logout
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* ── HERO ── */}
-      <section className="relative pt-36 pb-16 px-6">
+      <section className="relative pt-28 sm:pt-36 pb-14 sm:pb-16 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left */}
@@ -794,17 +875,17 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
                 Platform Aspirasi Cerdas
               </div>
 
-              <h1 className="text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.05] mb-6">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.05] mb-6">
                 <span className="hero-title-1 block">Suarakan</span>
                 <span className="hero-title-2 block text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 animate-gradient-x mt-1">
                   Aspirasimu.
                 </span>
-                <span className="hero-title-1 block text-4xl md:text-5xl text-slate-300 font-extrabold mt-1">
+                <span className="hero-title-1 block text-3xl sm:text-4xl md:text-5xl text-slate-300 font-extrabold mt-1">
                   Bangun Sekolah Lebih Baik.
                 </span>
               </h1>
 
-              <p className="hero-sub text-slate-400 text-lg leading-relaxed mb-10 max-w-xl">
+              <p className="hero-sub text-slate-400 text-base sm:text-lg leading-relaxed mb-8 sm:mb-10 max-w-xl">
                 Platform cerdas untuk melaporkan, memantau, dan menyelesaikan
                 masalah sarana & prasarana sekolah secara{" "}
                 <span className="text-indigo-400 font-semibold">
@@ -862,7 +943,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       <Ticker />
 
       {/* ── STATS ── */}
-      <section className="py-16 px-6">
+      <section className="py-16 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="stats-section grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard
@@ -898,7 +979,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       </section>
 
       {/* ── FEATURES ── */}
-      <section id="features" className="feat-section py-24 px-6">
+      <section id="features" className="feat-section py-20 sm:py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="feat-label text-center mb-16">
             <span className="inline-block px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-4">
@@ -1016,7 +1097,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       {/* ── HOW IT WORKS ── */}
       <section
         id="how"
-        className="how-section py-24 px-6 bg-slate-900/40 border-y border-white/5"
+        className="how-section py-20 sm:py-24 px-4 sm:px-6 bg-slate-900/40 border-y border-white/5"
       >
         <div className="max-w-7xl mx-auto">
           <div className="how-label text-center mb-16">
@@ -1121,7 +1202,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       </section>
 
       {/* ── LIVE PREVIEW ── */}
-      <section className="preview-section py-24 px-6">
+      <section className="preview-section py-20 sm:py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left — mockup */}
@@ -1196,7 +1277,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       </section>
 
       {/* ── COMPARISON ── */}
-      <section className="comp-section py-24 px-6 bg-slate-900/40 border-y border-white/5">
+      <section className="comp-section py-20 sm:py-24 px-4 sm:px-6 bg-slate-900/40 border-y border-white/5">
         <div className="max-w-5xl mx-auto">
           <div className="comp-label text-center mb-14">
             <span className="inline-block px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider mb-4">
@@ -1279,7 +1360,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       </section>
 
       {/* ── CATEGORIES ── */}
-      <section id="categories" className="cat-section py-24 px-6">
+      <section id="categories" className="cat-section py-20 sm:py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="cat-label flex flex-col md:flex-row md:items-end justify-between mb-14 gap-6">
             <div>
@@ -1361,7 +1442,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       </section>
 
       {/* ── TESTIMONIALS ── */}
-      <section className="testi-section py-24 px-6 bg-slate-900/40 border-y border-white/5">
+      <section className="testi-section py-20 sm:py-24 px-4 sm:px-6 bg-slate-900/40 border-y border-white/5">
         <div className="max-w-7xl mx-auto">
           <div className="testi-label text-center mb-14">
             <span className="inline-block px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-bold uppercase tracking-wider mb-4">
@@ -1437,7 +1518,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       </section>
 
       {/* ── FAQ ── */}
-      <section id="faq" className="faq-section py-24 px-6">
+      <section id="faq" className="faq-section py-20 sm:py-24 px-4 sm:px-6">
         <div className="max-w-3xl mx-auto">
           <div className="faq-label text-center mb-14">
             <span className="inline-block px-3 py-1 rounded-full bg-slate-700/50 border border-white/10 text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">
@@ -1460,7 +1541,7 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       </section>
 
       {/* ── CTA BANNER ── */}
-      <section className="cta-section py-24 px-6">
+      <section className="cta-section py-20 sm:py-24 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
           <div className="cta-content relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900/60 via-purple-900/40 to-slate-900 border border-white/10 p-12 text-center shadow-2xl">
             <div className="absolute inset-0 pointer-events-none">
@@ -1630,14 +1711,14 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       </footer>
 
       {/* ── FAB ── */}
-      <div className="fab-anim fixed bottom-8 right-8 z-50 group">
+      <div className="fab-anim fixed bottom-5 right-4 sm:bottom-8 sm:right-8 z-50 group">
         <Link
           href="/chat"
           className="flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-full p-4 shadow-2xl shadow-indigo-500/30 transition-all duration-300 hover:scale-110 active:scale-95"
         >
           <MessageCircle className="w-6 h-6" />
         </Link>
-        <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-slate-800 text-white text-sm font-medium py-2 px-4 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0 whitespace-nowrap pointer-events-none border border-white/10 shadow-xl">
+        <span className="hidden sm:block absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-slate-800 text-white text-sm font-medium py-2 px-4 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0 whitespace-nowrap pointer-events-none border border-white/10 shadow-xl">
           Buka Chatbot
         </span>
       </div>

@@ -110,21 +110,21 @@ export default function Reports() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
       >
         <div>
-          <h1 className="text-3xl font-bold text-white">Laporan</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Laporan</h1>
           <p className="text-slate-400 mt-1">Analisis dan statistik pengaduan</p>
         </div>
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-emerald-500/30"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-emerald-500/30"
         >
           <Download className="w-5 h-5" />
           Export PDF
@@ -135,7 +135,7 @@ export default function Reports() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="flex items-center gap-2"
+        className="flex items-center gap-2 flex-wrap"
       >
         <Filter className="w-4 h-4 text-slate-400" />
         <select

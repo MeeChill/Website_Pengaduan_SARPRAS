@@ -68,14 +68,14 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 animate-fade-in">
       {/* Header */}
-      <div className="mb-8 relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900 p-8 border border-white/10 shadow-2xl">
+      <div className="mb-8 relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900 p-5 sm:p-8 border border-white/10 shadow-2xl">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-indigo-500/10 blur-3xl animate-pulse-glow"></div>
         <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 rounded-full bg-purple-500/10 blur-3xl animate-pulse-glow delay-1000"></div>
         <div className="relative z-10">
-          <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 tracking-tight mb-2">Admin Dashboard</h1>
-          <p className="text-indigo-200/80 text-lg font-medium">Pantau dan kelola semua pengaduan dengan mudah.</p>
+          <h1 className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 tracking-tight mb-2">Admin Dashboard</h1>
+          <p className="text-indigo-200/80 text-sm sm:text-lg font-medium">Pantau dan kelola semua pengaduan dengan mudah.</p>
         </div>
       </div>
 
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Action Button */}
-      <div className="glass-panel rounded-2xl border border-white/5 p-8 shadow-lg text-center">
+      <div className="glass-panel rounded-2xl border border-white/5 p-5 sm:p-8 shadow-lg text-center">
         <h3 className="text-white font-bold mb-3 text-lg">Kelola Pengaduan</h3>
         <p className="text-slate-400 mb-6">Akses semua fitur manajemen pengaduan di halaman management</p>
         <Link

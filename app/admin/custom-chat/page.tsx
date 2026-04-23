@@ -349,11 +349,15 @@ function CustomChatAdmin() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden">
       {/* ══════════════════════════════════════════════════════
           LEFT PANEL — Chat List
       ══════════════════════════════════════════════════════ */}
-      <div className="w-1/3 min-w-0 border-r border-white/10 flex flex-col bg-slate-900/50">
+      <div
+        className={`${
+          selectedChat ? "hidden md:flex" : "flex"
+        } w-full md:w-1/3 min-w-0 border-r border-white/10 flex-col bg-slate-900/50`}
+      >
         {/* Header */}
         <div className="px-4 pt-5 pb-3 border-b border-white/5">
           <div className="flex items-center justify-between mb-4">
@@ -470,7 +474,11 @@ function CustomChatAdmin() {
       {/* ══════════════════════════════════════════════════════
           RIGHT PANEL — Chat Detail
       ══════════════════════════════════════════════════════ */}
-      <div className="flex-1 flex flex-col min-w-0 bg-slate-950/50">
+      <div
+        className={`${
+          selectedChat ? "flex" : "hidden md:flex"
+        } flex-1 flex-col min-w-0 bg-slate-950/50`}
+      >
         {!selectedChat ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-600">
@@ -485,8 +493,14 @@ function CustomChatAdmin() {
         ) : (
           <>
             {/* ── Chat Header ─────────────────────────────────── */}
-            <div className="px-5 py-3.5 border-b border-white/10 bg-slate-900/60 backdrop-blur-sm flex items-start justify-between gap-4">
+            <div className="px-3 sm:px-5 py-3.5 border-b border-white/10 bg-slate-900/60 backdrop-blur-sm flex items-start justify-between gap-3 sm:gap-4">
               <div className="min-w-0 flex-1">
+                <button
+                  onClick={() => setSelectedChat(null)}
+                  className="md:hidden mb-2 text-xs text-indigo-300 hover:text-indigo-200"
+                >
+                  ← Kembali ke daftar
+                </button>
                 <p className="text-white font-semibold truncate">
                   {selectedChat.judul}
                 </p>
@@ -518,7 +532,7 @@ function CustomChatAdmin() {
               </div>
 
               {/* Controls */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                 <PrioritySelect
                   value={selectedChat.prioritas}
                   onChange={(val) =>

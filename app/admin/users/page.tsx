@@ -139,15 +139,15 @@ export default function UsersManagement() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-4"
       >
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-white">Kelola User</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Kelola User</h1>
           <motion.button
             onClick={() => {
               setEditingUser(null);
@@ -163,7 +163,7 @@ export default function UsersManagement() {
             }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-indigo-500/30"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-indigo-500/30"
           >
             <Plus className="w-5 h-5" />
             Tambah User
@@ -237,8 +237,8 @@ export default function UsersManagement() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full min-w-[860px]">
             <thead className="bg-slate-900/50 border-b border-white/10">
               <tr>
                 <th className="text-left p-4 text-indigo-300 font-semibold text-sm">Nama</th>
@@ -328,6 +328,51 @@ export default function UsersManagement() {
               </AnimatePresence>
             </tbody>
           </table>
+        </div>
+        <div className="md:hidden p-3 space-y-3">
+          {filteredUsers.length === 0 ? (
+            <p className="text-center text-slate-400 py-8">Tidak ada user ditemukan</p>
+          ) : (
+            filteredUsers.map((user) => (
+              <div
+                key={user.id}
+                className="rounded-xl border border-white/10 bg-slate-900/40 p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-white font-semibold text-sm">{user.nama}</p>
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold ${
+                      user.role === "admin"
+                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                        : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                    }`}
+                  >
+                    {user.role === "admin" ? "Admin" : "User"}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-400 space-y-1">
+                  <p>Username: {user.username}</p>
+                  <p>NISN: {user.nisn || "-"}</p>
+                  <p>Kelas: {user.kelas || "-"}</p>
+                  <p>Total Pengaduan: {user.totalAspirasi}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleEdit(user)}
+                    className="flex-1 p-2 rounded-lg bg-blue-500/15 text-blue-300 text-xs"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(user.id)}
+                    className="flex-1 p-2 rounded-lg bg-red-500/15 text-red-300 text-xs"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </motion.div>
 

@@ -404,6 +404,7 @@ export default function ChatPage() {
 
   // ── UI ────────────────────────────────────────
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const isSidebarCollapsed = !isSidebarOpen;
 
   // ── Refs ──────────────────────────────────────
@@ -424,6 +425,17 @@ export default function ChatPage() {
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
+
+  useEffect(() => {
+    const syncViewport = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobileViewport(mobile);
+      setIsSidebarOpen(!mobile);
+    };
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
 
   // ─────────────────────────────────────────────
   // Load data on auth
@@ -1137,11 +1149,17 @@ export default function ChatPage() {
     <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden selection:bg-indigo-500/30">
       {/* Confetti */}
       {showConfetti && <ConfettiEffect />}
+      {isMobileViewport && isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-10 bg-black/60"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
       {/* ══════════════ SIDEBAR ══════════════ */}
       <aside
         className={`
-          ${isSidebarOpen ? "w-72 translate-x-0" : "w-72 -translate-x-full md:w-20 md:translate-x-0"}
+          ${isSidebarOpen ? "w-[85vw] max-w-72 translate-x-0" : "w-[85vw] max-w-72 -translate-x-full md:w-20 md:translate-x-0"}
           transition-all duration-300 ease-in-out flex flex-col
           bg-slate-950/60 border-r border-white/5 backdrop-blur-xl
           absolute md:relative z-20 h-full shrink-0
@@ -1233,6 +1251,7 @@ export default function ChatPage() {
                       } else {
                         handleSelectCustomChat(item.id);
                       }
+                      if (isMobileViewport) setIsSidebarOpen(false);
                     }}
                     title={item.judul}
                     className={`
@@ -1347,10 +1366,10 @@ export default function ChatPage() {
       {/* ══════════════ MAIN AREA ══════════════ */}
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-900 to-black">
         {/* Header */}
-        <header className="h-16 flex items-center px-4 border-b border-white/5 bg-slate-900/60 backdrop-blur-sm z-10 sticky top-0 shrink-0">
+        <header className="h-16 flex items-center px-3 sm:px-4 border-b border-white/5 bg-slate-900/60 backdrop-blur-sm z-10 sticky top-0 shrink-0">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors mr-4"
+            className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors mr-2 sm:mr-4"
             title="Toggle sidebar"
           >
             <Menu className="w-5 h-5" />
