@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { pusherServer } from '@/lib/pusher';
 
 type LaporanHistoryItem = {
   role: 'bot' | 'user';
@@ -121,40 +122,52 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const customChat = await prisma.customChat.create({
-      data: {
-        user_id: parseInt(session.user.id),
-        aspirasi_id: aspirasi.id,
-        judul: `${aspirasi.nomor_tiket} - ${aspirasi.judul}`,
-        status: 'open',
-        prioritas: 'normal',
-        messages: {
-          create: {
-            sender_id: parseInt(session.user.id),
-            sender_role: 'user',
-            konten: buildInitialChatMessage(
-              aspirasi.nomor_tiket,
-              aspirasi.judul,
-              aspirasi.lokasi,
-              aspirasi.deskripsi,
-              riwayatChat
-            ),
-            foto_url: fotoBeforeUrl,
-          },
-        },
-      },
-      include: {
-        messages: {
-          orderBy: { dibuat_pada: 'asc' },
-        },
-      },
+    const admins = await prisma.user.findMany({
+      where: { role: 'admin' },
+      select: { id: true },
     });
+    if (admins.length > 0) {
+      await prisma.notifikasi.createMany({
+        data: admins.map((admin) => ({
+          penerima_id: admin.id,
+          jenis: 'new_aspirasi',
+          pesan: `Laporan baru diajukan: ${aspirasi.nomor_tiket} - ${aspirasi.judul}`,
+          aspirasi_id: aspirasi.id,
+        })),
+      });
+      if (pusherServer) {
+        await pusherServer.trigger('admin-custom-chats', 'notification', {
+          id: Date.now(),
+          jenis: 'new_aspirasi',
+          pesan: `Laporan baru diajukan: ${aspirasi.nomor_tiket} - ${aspirasi.judul}`,
+          dibaca: false,
+          tanggal_notif: new Date().toISOString(),
+          aspirasi_id: aspirasi.id,
+        });
+      }
+    }
+
+    // Simpan ringkasan riwayat laporan sebagai jejak percakapan di backend logs.
+    // Tidak lagi membuat thread custom chat otomatis agar alur tetap di tab Buat Laporan.
+    const laporanTranscript = buildInitialChatMessage(
+      aspirasi.nomor_tiket,
+      aspirasi.judul,
+      aspirasi.lokasi,
+      aspirasi.deskripsi,
+      riwayatChat
+    );
+    if (laporanTranscript) {
+      console.info('Laporan transcript saved:', {
+        aspirasi_id: aspirasi.id,
+        length: laporanTranscript.length,
+      });
+    }
 
     return NextResponse.json({ 
       success: true, 
       nomor_tiket: aspirasi.nomor_tiket,
       aspirasi,
-      custom_chat_id: customChat.id,
+      custom_chat_id: null,
     });
 
   } catch (error) {
@@ -209,7 +222,15 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           user: true,
-          kategori: true
+          kategori: true,
+          progres_updates: {
+            include: {
+              admin: {
+                select: { nama: true },
+              },
+            },
+            orderBy: { tanggal_update: 'asc' },
+          },
         },
         orderBy: { tanggal_input: 'desc' }
       });

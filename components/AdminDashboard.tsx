@@ -14,6 +14,7 @@ interface StatusCount {
   pending: number;
   dalam_progres: number;
   selesai: number;
+  ditolak: number;
 }
 
 export default function AdminDashboard() {
@@ -22,7 +23,8 @@ export default function AdminDashboard() {
   const [statusCount, setStatusCount] = useState<StatusCount>({
     pending: 0,
     dalam_progres: 0,
-    selesai: 0
+    selesai: 0,
+    ditolak: 0
   });
 
   useEffect(() => {
@@ -39,11 +41,14 @@ export default function AdminDashboard() {
       const counts = {
         pending: 0,
         dalam_progres: 0,
-        selesai: 0
+        selesai: 0,
+        ditolak: 0
       };
       
       data.aspirasi.forEach((item: Aspirasi) => {
-        counts[item.status as keyof StatusCount]++;
+        if (item.status in counts) {
+          counts[item.status as keyof StatusCount]++;
+        }
       });
       
       setStatusCount(counts);
@@ -80,7 +85,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8 animate-slide-up" style={{ animationDelay: '0.2s' }}>
         <div className="glass-panel p-6 rounded-2xl border border-white/5 hover:border-indigo-500/30 transition-all hover:-translate-y-1 shadow-lg hover:shadow-indigo-500/10 group">
           <div className="flex items-center justify-between">
             <div>
@@ -125,6 +130,17 @@ export default function AdminDashboard() {
             </div>
             <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
               <CheckCircle className="w-6 h-6 text-emerald-400" />
+            </div>
+          </div>
+        </div>
+        <div className="glass-panel p-6 rounded-2xl border border-white/5 hover:border-red-500/30 transition-all hover:-translate-y-1 shadow-lg hover:shadow-red-500/10 group">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-400 text-sm font-medium">Ditolak</p>
+              <p className="text-2xl font-bold text-white mt-1">{statusCount.ditolak}</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <AlertCircle className="w-6 h-6 text-red-400" />
             </div>
           </div>
         </div>

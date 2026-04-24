@@ -123,6 +123,7 @@ export default function ComplaintsManagement() {
               <option value="pending">Pending</option>
               <option value="dalam_progres">Dalam Proses</option>
               <option value="selesai">Selesai</option>
+              <option value="ditolak">Ditolak</option>
             </select>
           </div>
         </div>

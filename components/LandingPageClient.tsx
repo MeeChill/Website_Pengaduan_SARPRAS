@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import {
   ArrowRight,
   ShieldCheck,
@@ -39,6 +40,7 @@ gsap.registerPlugin(ScrollTrigger);
 interface Props {
   isLoggedIn: boolean;
   userName: string | null;
+  userRole: string | null;
 }
 
 // ─── Animated Chat Mockup ─────────────────────────────────────────────────────
@@ -408,10 +410,16 @@ function Ticker() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function LandingPageClient({ isLoggedIn, userName }: Props) {
+export default function LandingPageClient({ isLoggedIn, userName, userRole }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [navScrolled, setNavScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleLogout = async () => {
+    const ok = window.confirm("Yakin ingin logout?");
+    if (!ok) return;
+    await signOut({ redirect: true, callbackUrl: "/login" });
+  };
 
   // Nav scroll effect
   useEffect(() => {
@@ -512,20 +520,43 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
       });
 
       /* Features */
-      gsap.from(".feat-label", {
-        scrollTrigger: { trigger: ".feat-section", start: "top 82%" },
-        opacity: 0,
-        y: 25,
-        duration: 0.5,
-      });
-      gsap.from(".feat-card", {
-        scrollTrigger: { trigger: ".feat-section", start: "top 74%" },
-        opacity: 0,
-        y: 55,
-        duration: 0.6,
-        stagger: 0.14,
-        ease: "power3.out",
-      });
+      gsap.fromTo(
+        ".feat-label",
+        { opacity: 0, y: 25 },
+        {
+          scrollTrigger: {
+            trigger: ".feat-section",
+            start: "top 82%",
+            once: true,
+            toggleActions: "play none none none",
+          },
+          opacity: 1,
+          y: 0,
+          duration: 0.5,
+          ease: "power2.out",
+          immediateRender: false,
+          clearProps: "opacity,transform",
+        },
+      );
+      gsap.fromTo(
+        ".feat-card",
+        { opacity: 0, y: 55 },
+        {
+          scrollTrigger: {
+            trigger: ".feat-section",
+            start: "top 74%",
+            once: true,
+            toggleActions: "play none none none",
+          },
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          stagger: 0.14,
+          ease: "power3.out",
+          immediateRender: false,
+          clearProps: "opacity,transform",
+        },
+      );
 
       /* How It Works */
       gsap.from(".how-label", {
@@ -740,6 +771,9 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
             <a href="#how" className="hover:text-white transition-colors">
               Cara Kerja
             </a>
+            <Link href="/public-feed" className="hover:text-white transition-colors">
+              Public Feed
+            </Link>
             <a
               href="#categories"
               className="hover:text-white transition-colors"
@@ -767,12 +801,26 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
                 >
                   Buka Chat
                 </Link>
+                {userRole === "admin" && (
+                  <Link
+                    href="/admin"
+                    className="hidden sm:inline-flex px-5 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-200 font-semibold transition-all text-sm"
+                  >
+                    Admin Panel
+                  </Link>
+                )}
                 <Link
-                  href="/api/auth/signout"
+                  href="/riwayat"
+                  className="hidden sm:inline-flex px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-semibold transition-all text-sm"
+                >
+                  Riwayat
+                </Link>
+                <button
+                  onClick={handleLogout}
                   className="hidden sm:inline-flex px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-semibold transition-all text-sm"
                 >
                   Logout
-                </Link>
+                </button>
               </>
             ) : (
               <>
@@ -829,6 +877,13 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
               >
                 Kategori
               </a>
+              <Link
+                href="/public-feed"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2.5 rounded-lg hover:bg-white/5"
+              >
+                Public Feed
+              </Link>
               <a
                 href="#faq"
                 onClick={() => setMobileMenuOpen(false)}
@@ -847,13 +902,26 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
                   </Link>
                 )}
                 {isLoggedIn && (
-                  <Link
-                    href="/api/auth/signout"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-center"
-                  >
-                    Logout
-                  </Link>
+                  <>
+                    {userRole === "admin" && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex-1 px-3 py-2.5 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-center text-emerald-200"
+                      >
+                        Admin Panel
+                      </Link>
+                    )}
+                    <button
+                      onClick={async () => {
+                        setMobileMenuOpen(false);
+                        await handleLogout();
+                      }}
+                      className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-center"
+                    >
+                      Logout
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -998,9 +1066,9 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
             {[
               {
                 icon: Activity,
-                title: "Real-time Tracking",
-                desc: "Pantau setiap tahapan progres laporanmu dari validasi hingga pengerjaan tuntas langsung dari layar perangkatmu tanpa perlu bolak-balik bertanya.",
-                badge: "Live Update",
+                title: "Tracking Tiket Real-time",
+                desc: "Setiap tiket punya status yang bergerak otomatis dari pending, dalam progres, hingga selesai. User tidak perlu tanya manual ke admin.",
+                badge: "Live Tracking",
                 badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
                 gradient: "from-blue-500/10 to-transparent",
                 border: "hover:border-blue-500/30",
@@ -1008,9 +1076,9 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
               },
               {
                 icon: ShieldCheck,
-                title: "Transparansi Penuh",
-                desc: "Setiap laporan diverifikasi oleh admin dengan bukti foto Before & After. Semua proses tercatat rapi, tidak ada yang bisa disembunyikan.",
-                badge: "Verified",
+                title: "Transparansi Bukti",
+                desc: "Semua proses terdokumentasi dengan foto before/after dan jejak update. Laporan jadi terukur dan bisa diaudit kapan saja.",
+                badge: "Audit Trail",
                 badgeColor:
                   "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
                 gradient: "from-emerald-500/10 to-transparent",
@@ -1019,9 +1087,9 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
               },
               {
                 icon: Bell,
-                title: "Notifikasi Instan",
-                desc: "Terima notifikasi real-time setiap kali ada pembaruan pada laporanmu. Tidak ada yang terlewat, semua update langsung masuk ke aplikasi.",
-                badge: "Real-time",
+                title: "Notifikasi Otomatis",
+                desc: "Setiap perubahan status dan balasan admin langsung muncul di aplikasi. User selalu tahu progres terbaru tanpa refresh manual.",
+                badge: "Instant Alert",
                 badgeColor:
                   "bg-purple-500/10 text-purple-400 border-purple-500/20",
                 gradient: "from-purple-500/10 to-transparent",
@@ -1030,9 +1098,9 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
               },
               {
                 icon: Bot,
-                title: "AI Chatbot",
-                desc: "Asisten virtual NEO-Bot siap 24/7 membantu kamu mengisi laporan, menjawab pertanyaan umum, dan memandu proses pengaduan dengan mudah.",
-                badge: "AI-Powered",
+                title: "NEO-Bot Assistant",
+                desc: "Template tanya jawab siap pakai + autocorrect ke topik terdekat membantu user mendapatkan jawaban cepat sebelum membuat laporan.",
+                badge: "Smart Bot",
                 badgeColor:
                   "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
                 gradient: "from-indigo-500/10 to-transparent",
@@ -1041,9 +1109,9 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
               },
               {
                 icon: Award,
-                title: "Bukti After-Before",
-                desc: "Setiap penyelesaian wajib dilengkapi foto After oleh admin sebagai standar kualitas. Kamu bisa membandingkan kondisi sebelum dan sesudah perbaikan.",
-                badge: "Akuntabel",
+                title: "Standar Penyelesaian",
+                desc: "Admin wajib melampirkan bukti penyelesaian agar kualitas penanganan terjaga. User bisa langsung menilai hasil tindak lanjut.",
+                badge: "Quality Check",
                 badgeColor:
                   "bg-amber-500/10 text-amber-400 border-amber-500/20",
                 gradient: "from-amber-500/10 to-transparent",
@@ -1052,9 +1120,9 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
               },
               {
                 icon: MessageCircle,
-                title: "Chat Langsung ke Admin",
-                desc: "Punya pertanyaan spesifik? Gunakan fitur Chat Custom untuk berkomunikasi langsung dengan admin. Privat, cepat, dan profesional.",
-                badge: "Direct Chat",
+                title: "Tindak Lanjut via Chat",
+                desc: "Jika kasus butuh klarifikasi, user dapat lanjut diskusi melalui chat custom dengan admin pada tiket yang sama.",
+                badge: "Follow Up",
                 badgeColor: "bg-pink-500/10 text-pink-400 border-pink-500/20",
                 gradient: "from-pink-500/10 to-transparent",
                 border: "hover:border-pink-500/30",
@@ -1572,6 +1640,14 @@ export default function LandingPageClient({ isLoggedIn, userName }: Props) {
                   Mulai Gratis
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
+                {isLoggedIn && (
+                  <Link
+                    href="/aspirasi-selesai"
+                    className="px-8 py-4 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-200 font-bold text-lg transition-all hover:scale-105"
+                  >
+                    Lihat Aspirasi Selesai
+                  </Link>
+                )}
                 <Link
                   href="#faq"
                   className="px-8 py-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-lg transition-all hover:scale-105"

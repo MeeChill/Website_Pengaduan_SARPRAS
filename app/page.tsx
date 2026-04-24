@@ -9,6 +9,7 @@ export default async function LandingPage() {
     <LandingPageClient
       isLoggedIn={!!session}
       userName={session?.user?.name ?? null}
+      userRole={session?.user?.role ?? null}
     />
   );
 }

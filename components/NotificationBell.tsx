@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import {
   Bell,
   X,
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import PusherJs from "pusher-js";
+import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +67,8 @@ function NotifIcon({ jenis }: { jenis: string }) {
       return (
         <MessageSquare className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
       );
+    case "new_aspirasi":
+      return <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />;
     case "warning":
       return <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />;
     default:
@@ -77,11 +81,19 @@ function NotifIcon({ jenis }: { jenis: string }) {
 export default function NotificationBell({ role }: Props) {
   const { data: session } = useSession();
   const userId = (session?.user as { id?: string })?.id;
+  const router = useRouter();
 
   const [notifikasi, setNotifikasi] = useState<Notifikasi[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [portalReady, setPortalReady] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number }>({
+    top: 0,
+    left: 0,
+    width: 320,
+  });
 
   // ── Fetch from API ──────────────────────────────────────────────────────────
 
@@ -99,6 +111,7 @@ export default function NotificationBell({ role }: Props) {
   // ── Polling fallback (30 s) ─────────────────────────────────────────────────
 
   useEffect(() => {
+    setPortalReady(true);
     fetchNotifikasi();
     const timer = setInterval(fetchNotifikasi, 30_000);
     return () => clearInterval(timer);
@@ -183,8 +196,32 @@ export default function NotificationBell({ role }: Props) {
     }
   };
 
+  const getNotificationTarget = (notif: Notifikasi) => {
+    if (role === "admin") {
+      if (notif.jenis === "new_aspirasi") return "/admin/management";
+      if (notif.aspirasi_id) return `/admin/management/${notif.aspirasi_id}`;
+      if (notif.custom_chat_id) return "/admin/custom-chat";
+      if (notif.jenis === "custom_chat_message" || notif.jenis === "custom_chat_new") {
+        return "/admin/custom-chat";
+      }
+      return "/admin";
+    }
+
+    if (
+      notif.custom_chat_id ||
+      notif.jenis === "custom_chat_message" ||
+      notif.jenis === "custom_chat_new"
+    ) {
+      return "/chat";
+    }
+    if (notif.aspirasi_id) return "/riwayat";
+    return "/chat";
+  };
+
   const handleClickNotif = (notif: Notifikasi) => {
     if (!notif.dibaca) markRead([notif.id]);
+    setIsOpen(false);
+    router.push(getNotificationTarget(notif));
   };
 
   const handleToggle = () => {
@@ -192,6 +229,29 @@ export default function NotificationBell({ role }: Props) {
     setIsOpen(next);
     if (next) fetchNotifikasi();
   };
+
+  // ── Positioning for portal dropdown ─────────────────────────────────────────
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const update = () => {
+      const btn = buttonRef.current;
+      if (!btn) return;
+      const r = btn.getBoundingClientRect();
+      const width = 320;
+      const gap = 12;
+      // Align right edge with button right edge
+      const left = Math.max(12, Math.min(window.innerWidth - width - 12, r.right - width));
+      const top = Math.min(window.innerHeight - 12, r.bottom + gap);
+      setPos({ top, left, width });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [isOpen]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
@@ -204,6 +264,7 @@ export default function NotificationBell({ role }: Props) {
     <div className="relative" ref={dropdownRef}>
       {/* Bell button */}
       <button
+        ref={buttonRef}
         onClick={handleToggle}
         className="relative p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         aria-label={`Notifikasi${unreadCount > 0 ? `, ${unreadCount} belum dibaca` : ""}`}
@@ -219,15 +280,18 @@ export default function NotificationBell({ role }: Props) {
       </button>
 
       {/* Dropdown */}
-      {isOpen && (
-        <div
-          className={[
-            "absolute right-0 top-12 w-80 z-50 overflow-hidden",
-            "bg-slate-900/95 backdrop-blur-xl",
-            "border border-white/10 rounded-2xl shadow-2xl shadow-black/60",
-            "animate-in fade-in slide-in-from-top-2 duration-150",
-          ].join(" ")}
-        >
+      {isOpen &&
+        portalReady &&
+        createPortal(
+          <div
+            className={[
+              "fixed z-[999999] overflow-hidden",
+              "bg-slate-900/95 backdrop-blur-xl",
+              "border border-white/10 rounded-2xl shadow-2xl shadow-black/60",
+              "animate-in fade-in slide-in-from-top-2 duration-150",
+            ].join(" ")}
+            style={{ top: pos.top, left: pos.left, width: pos.width }}
+          >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02]">
             <div className="flex items-center gap-2">
@@ -314,8 +378,9 @@ export default function NotificationBell({ role }: Props) {
               </p>
             </div>
           )}
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

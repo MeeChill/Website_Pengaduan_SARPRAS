@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Download, TrendingUp, Calendar, BarChart3, PieChart, LineChart, Filter } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface ReportStats {
   totalAspirasi: number;
@@ -19,48 +22,222 @@ interface ReportStats {
   categoryDistribution: Record<string, number>;
 }
 
+interface AspirasiItem {
+  nomor_tiket: string;
+  judul: string;
+  lokasi: string;
+  status: string;
+  tanggal_input: string;
+  tanggal_selesai?: string | null;
+  rating?: number | null;
+  feedback?: string | null;
+  kategori?: { nama_kategori?: string };
+  user?: { nama?: string };
+}
+
 export default function Reports() {
   const [stats, setStats] = useState<ReportStats | null>(null);
+  const [aspirasiData, setAspirasiData] = useState<AspirasiItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     loadReports();
-  }, [dateRange]);
+  }, []);
+
+  const filteredAspirasi = useMemo(() => {
+    return aspirasiData.filter((item) => {
+      const itemTime = new Date(item.tanggal_input).getTime();
+      const startTime = startDate ? new Date(startDate).getTime() : null;
+      const endTime = endDate ? new Date(endDate).getTime() : null;
+
+      if (startTime && itemTime < startTime) return false;
+      if (endTime && itemTime > endTime) return false;
+      return true;
+    });
+  }, [aspirasiData, startDate, endDate]);
+
+  useEffect(() => {
+    const currentData = filteredAspirasi;
+    const nextStats: ReportStats = {
+      totalAspirasi: currentData.length,
+      pending: currentData.filter((a: any) => a.status === 'pending').length,
+      dalamProgres: currentData.filter((a: any) => a.status === 'dalam_progres').length,
+      selesai: currentData.filter((a: any) => a.status === 'selesai').length,
+      averageResolutionTime: '5.2 hari',
+      completionRate: currentData.length > 0 ? Math.round((currentData.filter((a: any) => a.status === 'selesai').length / currentData.length) * 100) : 0,
+      statusDistribution: {
+        pending: currentData.filter((a: any) => a.status === 'pending').length,
+        dalam_progres: currentData.filter((a: any) => a.status === 'dalam_progres').length,
+        selesai: currentData.filter((a: any) => a.status === 'selesai').length
+      },
+      categoryDistribution: currentData.reduce((acc: Record<string, number>, a: any) => {
+        const cat = a.kategori?.nama_kategori || 'Lainnya';
+        acc[cat] = (acc[cat] || 0) + 1;
+        return acc;
+      }, {})
+    };
+    setStats(nextStats);
+  }, [filteredAspirasi]);
 
   const loadReports = async () => {
     try {
       const response = await fetch('/api/aspirasi');
       if (response.ok) {
         const data = await response.json();
-        const aspirasi = data.aspirasi;
-
-        const stats: ReportStats = {
-          totalAspirasi: aspirasi.length,
-          pending: aspirasi.filter((a: any) => a.status === 'pending').length,
-          dalamProgres: aspirasi.filter((a: any) => a.status === 'dalam_progres').length,
-          selesai: aspirasi.filter((a: any) => a.status === 'selesai').length,
-          averageResolutionTime: '5.2 hari',
-          completionRate: aspirasi.length > 0 ? Math.round((aspirasi.filter((a: any) => a.status === 'selesai').length / aspirasi.length) * 100) : 0,
-          statusDistribution: {
-            pending: aspirasi.filter((a: any) => a.status === 'pending').length,
-            dalam_progres: aspirasi.filter((a: any) => a.status === 'dalam_progres').length,
-            selesai: aspirasi.filter((a: any) => a.status === 'selesai').length
-          },
-          categoryDistribution: aspirasi.reduce((acc: Record<string, number>, a: any) => {
-            const cat = a.kategori?.nama_kategori || 'Lainnya';
-            acc[cat] = (acc[cat] || 0) + 1;
-            return acc;
-          }, {})
-        };
-
-        setStats(stats);
+        const aspirasi = data.aspirasi as AspirasiItem[];
+        setAspirasiData(aspirasi);
       }
     } catch (error) {
       console.error('Error loading reports:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportExcel = () => {
+    if (filteredAspirasi.length === 0) return;
+
+    const rows = filteredAspirasi.map((a, idx) => [
+      idx + 1,
+      a.nomor_tiket,
+      a.judul,
+      a.kategori?.nama_kategori || "-",
+      a.user?.nama || "-",
+      a.lokasi,
+      a.status.replace("_", " "),
+      new Date(a.tanggal_input).toLocaleString("id-ID"),
+      a.tanggal_selesai ? new Date(a.tanggal_selesai).toLocaleString("id-ID") : "-",
+      a.rating ?? "-",
+      a.feedback ?? "-",
+    ]);
+
+    const aoa = [
+      ["LAPORAN ASPIRASI NEO-SARANA"],
+      [`Tanggal Export: ${new Date().toLocaleString("id-ID")}`],
+      [],
+      [
+        "No",
+        "Nomor Tiket",
+        "Judul",
+        "Kategori",
+        "Pelapor",
+        "Lokasi",
+        "Status",
+        "Tanggal Input",
+        "Tanggal Selesai",
+        "Rating",
+        "Feedback",
+      ],
+      ...rows,
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }];
+    ws["!cols"] = [
+      { wch: 6 },
+      { wch: 20 },
+      { wch: 32 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 16 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 10 },
+      { wch: 45 },
+    ];
+
+    ws["A1"].s = {
+      font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "1E3A8A" } },
+      alignment: { horizontal: "center", vertical: "center" },
+    };
+    ws["A2"].s = {
+      font: { italic: true, color: { rgb: "475569" } },
+    };
+
+    for (let c = 0; c <= 10; c += 1) {
+      const cell = XLSX.utils.encode_cell({ r: 3, c });
+      if (ws[cell]) {
+        ws[cell].s = {
+          font: { bold: true, color: { rgb: "FFFFFF" } },
+          fill: { fgColor: { rgb: "0F766E" } },
+          alignment: { horizontal: "center", vertical: "center", wrapText: true },
+          border: {
+            top: { style: "thin", color: { rgb: "FFFFFF" } },
+            bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+            left: { style: "thin", color: { rgb: "FFFFFF" } },
+            right: { style: "thin", color: { rgb: "FFFFFF" } },
+          },
+        };
+      }
+    }
+
+    for (let r = 4; r < aoa.length; r += 1) {
+      for (let c = 0; c <= 10; c += 1) {
+        const cell = XLSX.utils.encode_cell({ r, c });
+        if (!ws[cell]) continue;
+        ws[cell].s = {
+          alignment: { vertical: "top", wrapText: true },
+          border: {
+            top: { style: "thin", color: { rgb: "CBD5E1" } },
+            bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+            left: { style: "thin", color: { rgb: "CBD5E1" } },
+            right: { style: "thin", color: { rgb: "CBD5E1" } },
+          },
+          fill: {
+            fgColor: { rgb: r % 2 === 0 ? "F8FAFC" : "FFFFFF" },
+          },
+        };
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Aspirasi");
+    XLSX.writeFile(wb, `laporan-aspirasi-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const handleExportPDF = () => {
+    if (filteredAspirasi.length === 0) return;
+
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('LAPORAN ASPIRASI NEO-SARANA', 14, 14);
+    doc.setFontSize(10);
+    doc.text(`Tanggal Export: ${new Date().toLocaleString('id-ID')}`, 14, 21);
+
+    autoTable(doc, {
+      startY: 28,
+      head: [[
+        'No',
+        'Nomor Tiket',
+        'Judul',
+        'Kategori',
+        'Pelapor',
+        'Lokasi',
+        'Status',
+        'Tanggal Input',
+        'Tanggal Selesai',
+      ]],
+      body: filteredAspirasi.map((a, idx) => [
+        idx + 1,
+        a.nomor_tiket,
+        a.judul,
+        a.kategori?.nama_kategori || '-',
+        a.user?.nama || '-',
+        a.lokasi,
+        a.status.replace('_', ' '),
+        new Date(a.tanggal_input).toLocaleString('id-ID'),
+        a.tanggal_selesai ? new Date(a.tanggal_selesai).toLocaleString('id-ID') : '-',
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [15, 118, 110] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
+
+    doc.save(`laporan-aspirasi-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   const containerVariants = {
@@ -121,14 +298,26 @@ export default function Reports() {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Laporan</h1>
           <p className="text-slate-400 mt-1">Analisis dan statistik pengaduan</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-emerald-500/30"
-        >
-          <Download className="w-5 h-5" />
-          Export PDF
-        </motion.button>
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleExportPDF}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-rose-500/30"
+          >
+            <Download className="w-5 h-5" />
+            Export PDF
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleExportExcel}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-emerald-500/30"
+          >
+            <Download className="w-5 h-5" />
+            Export Excel
+          </motion.button>
+        </div>
       </motion.div>
 
       {/* Filters */}
@@ -138,16 +327,26 @@ export default function Reports() {
         className="flex items-center gap-2 flex-wrap"
       >
         <Filter className="w-4 h-4 text-slate-400" />
-        <select
-          value={dateRange}
-          onChange={(e) => setDateRange(e.target.value)}
-          className="bg-slate-800/50 border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-        >
-          <option value="all">Semua Waktu</option>
-          <option value="month">Bulan Ini</option>
-          <option value="quarter">Kuartal Ini</option>
-          <option value="year">Tahun Ini</option>
-        </select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full sm:w-auto">
+          <div className="space-y-1">
+            <p className="text-[11px] text-slate-400">Tanggal Mulai</p>
+            <input
+              type="datetime-local"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            />
+          </div>
+          <div className="space-y-1">
+            <p className="text-[11px] text-slate-400">Tanggal Akhir</p>
+            <input
+              type="datetime-local"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            />
+          </div>
+        </div>
       </motion.div>
 
       {/* Key Metrics */}

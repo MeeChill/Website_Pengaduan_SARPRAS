@@ -85,6 +85,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return pathname.startsWith(href);
   };
 
+  const handleLogout = async () => {
+    const ok = window.confirm("Yakin ingin logout?");
+    if (!ok) return;
+    await signOut({ redirect: true, callbackUrl: "/login" });
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -222,7 +228,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           transition={{ delay: 0.5 }}
         >
           <motion.button
-            onClick={() => signOut({ redirect: true, callbackUrl: "/login" })}
+            onClick={handleLogout}
             className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/30 transition-all group"
             whileHover={{ x: 4 }}
             whileTap={{ scale: 0.98 }}

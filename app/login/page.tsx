@@ -28,7 +28,7 @@ export default function LoginPage() {
       })
 
       if (result?.error) {
-        setError('Kredensial tidak valid. Silakan periksa NIPD dan kata sandi Anda.')
+        setError('Kredensial tidak valid. Silakan periksa NISN/username dan kata sandi Anda.')
         setLoading(false)
       } else if (result?.ok) {
         // Get the updated session to access the role
@@ -68,7 +68,7 @@ export default function LoginPage() {
               Selamat Datang
             </h1>
             <p className="text-slate-400 text-base sm:text-lg">
-              Silakan masuk menggunakan NIPD Anda untuk mengakses layanan.
+              Silakan masuk menggunakan NISN atau username Anda untuk mengakses layanan.
             </p>
           </div>
           
@@ -85,7 +85,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
               <div>
-                <label className="block text-slate-300 text-sm font-medium mb-2 ml-1" htmlFor="username">NIPD / Username</label>
+                <label className="block text-slate-300 text-sm font-medium mb-2 ml-1" htmlFor="username">NISN / Username</label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <svg className="h-5 w-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,7 +96,7 @@ export default function LoginPage() {
                     className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
                     id="username"
                     type="text"
-                    placeholder="Masukkan NIPD Anda"
+                    placeholder="Masukkan NISN atau username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required

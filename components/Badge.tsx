@@ -10,6 +10,7 @@ export type StatusKey =
   | "pending"
   | "dalam_progres"
   | "selesai"
+  | "ditolak"
   | "open"
   | "in_progress"
   | "closed";
@@ -65,6 +66,14 @@ const STATUS_MAP: Record<StatusKey, BadgeConfig> = {
     bg: "bg-emerald-500/10",
     border: "border-emerald-500/30",
     glow: "shadow-emerald-500/20",
+  },
+  ditolak: {
+    label: "Ditolak",
+    dot: "bg-red-400",
+    text: "text-red-300",
+    bg: "bg-red-500/10",
+    border: "border-red-500/30",
+    glow: "shadow-red-500/20",
   },
   closed: {
     label: "Selesai",
@@ -339,6 +348,7 @@ const STATUS_ICON: Partial<Record<StatusKey, React.ReactNode>> = {
   pending: <Clock className="w-3 h-3" />,
   dalam_progres: <AlertCircle className="w-3 h-3" />,
   selesai: <CheckCircle className="w-3 h-3" />,
+  ditolak: <AlertCircle className="w-3 h-3" />,
 };
 
 export function ManagementStatusBadge({ status }: { status: string }) {

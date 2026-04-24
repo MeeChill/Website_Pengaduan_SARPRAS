@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { pusherServer } from '@/lib/pusher';
 
 export async function POST(
   request: NextRequest,
@@ -24,6 +25,20 @@ export async function POST(
       return NextResponse.json({ error: 'No photo provided' }, { status: 400 });
     }
 
+    const existing = await prisma.aspirasi.findUnique({
+      where: { id: parseInt(id) },
+      select: { status: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (existing.status === 'selesai' || existing.status === 'ditolak') {
+      return NextResponse.json(
+        { error: 'Laporan sudah final (selesai/ditolak). Tidak bisa upload foto after.' },
+        { status: 409 }
+      );
+    }
+
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
     await mkdir(uploadDir, { recursive: true });
 
@@ -42,7 +57,7 @@ export async function POST(
     });
 
     // Create notification for user
-    await prisma.notifikasi.create({
+    const notif = await prisma.notifikasi.create({
       data: {
         penerima_id: aspirasi.user_id,
         jenis: 'status_update',
@@ -50,6 +65,22 @@ export async function POST(
         aspirasi_id: parseInt(id)
       }
     });
+    if (pusherServer) {
+      await pusherServer.trigger(`user-${aspirasi.user_id}`, 'notification', {
+        id: notif.id,
+        jenis: notif.jenis,
+        pesan: notif.pesan,
+        dibaca: notif.dibaca,
+        tanggal_notif: notif.tanggal_notif.toISOString(),
+        aspirasi_id: notif.aspirasi_id ?? undefined,
+        custom_chat_id: notif.custom_chat_id ?? undefined,
+      });
+      await pusherServer.trigger(`user-${aspirasi.user_id}`, 'aspirasi-updated', {
+        aspirasi_id: parseInt(id),
+        type: 'photo_after',
+        foto_after: fotoAfterUrl,
+      });
+    }
 
     return NextResponse.json({ success: true, foto_after: fotoAfterUrl });
 

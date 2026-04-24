@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -22,6 +22,7 @@ import {
   Image as ImageIcon,
   Loader2,
   LogOut,
+  History,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { StatusBadge } from "@/components/Badge";
@@ -129,7 +130,27 @@ interface CustomChatMessage {
   dibuat_pada: string;
 }
 
-type LaporanMsg = { role: "bot" | "user"; content: string };
+interface AspirasiHistory {
+  id: number;
+  judul: string;
+  deskripsi: string;
+  lokasi: string;
+  nomor_tiket: string;
+  status: string;
+  tanggal_input: string;
+  foto_before?: string | null;
+  foto_after?: string | null;
+  rating?: number | null;
+  feedback?: string | null;
+  progres_updates?: {
+    id: number;
+    deskripsi_update: string;
+    tanggal_update: string;
+    admin?: { nama: string } | null;
+  }[];
+}
+
+type LaporanMsg = { role: "bot" | "user"; content: string; imageUrl?: string | null };
 type ChatMode = "bot" | "laporan" | "custom";
 type LaporanStep = -1 | 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -138,35 +159,47 @@ type LaporanStep = -1 | 0 | 1 | 2 | 3 | 4 | 5;
 // ─────────────────────────────────────────────
 const WELCOME_MESSAGE = `Halo! 👋 Selamat datang di **NEO-Bot**!
 
-Saya adalah asisten virtual NEO-SARANA yang siap membantu kamu dengan informasi seputar pengaduan & aspirasi sarana prasarana sekolah.
+Saya adalah asisten virtual NEO-SARANA yang siap bantu kamu memahami alur laporan sarana/prasarana sekolah secara cepat.
 
-Silakan pilih salah satu pertanyaan di bawah ini, atau ketik pertanyaanmu sendiri:`;
+Silakan pilih template pertanyaan di bawah ini, atau ketik pertanyaanmu sendiri.
+
+💡 Jika tulisanmu mirip salah satu template, saya akan autocorrect ke topik terdekat supaya jawabannya lebih tepat.`;
 
 const TEMPLATE_QUESTIONS = [
   {
     id: 1,
-    label: "📝 Cara membuat laporan",
-    query: "Bagaimana cara membuat laporan pengaduan?",
+    label: "📝 Panduan buat laporan",
+    query: "Bagaimana langkah lengkap membuat laporan pengaduan di NEO-SARANA?",
   },
   {
     id: 2,
-    label: "🔍 Cek status laporan",
-    query: "Bagaimana cara mengecek status laporan saya?",
+    label: "🔍 Cek status tiket",
+    query: "Bagaimana cara cek status tiket laporan saya?",
   },
   {
     id: 3,
-    label: "📋 Kategori pengaduan",
-    query: "Apa saja kategori pengaduan yang tersedia?",
+    label: "📋 Daftar kategori laporan",
+    query: "Apa saja kategori laporan yang tersedia di aplikasi?",
   },
   {
     id: 4,
-    label: "⏱️ Estimasi waktu penanganan",
-    query: "Berapa lama proses penanganan laporan pengaduan?",
+    label: "⏱️ Estimasi waktu proses",
+    query: "Berapa estimasi waktu dari laporan masuk sampai selesai?",
   },
   {
     id: 5,
-    label: "✅ Syarat membuat laporan",
-    query: "Apa saja syarat untuk membuat laporan pengaduan?",
+    label: "✅ Syarat laporan valid",
+    query: "Apa saja syarat agar laporan saya valid dan cepat diproses?",
+  },
+  {
+    id: 6,
+    label: "📸 Aturan upload foto",
+    query: "Bagaimana ketentuan upload foto before dan after pada laporan?",
+  },
+  {
+    id: 7,
+    label: "🆘 Laporan darurat",
+    query: "Jika ada kerusakan darurat, bagaimana cara melapor agar diprioritaskan?",
   },
 ];
 
@@ -205,6 +238,52 @@ const formatMsgTime = (dateStr: string) => {
   );
 };
 
+const LAPORAN_THREADS_KEY = "laporan_threads_v1";
+
+const normalizeText = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const levenshtein = (a: string, b: string) => {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const matrix: number[][] = Array.from({ length: a.length + 1 }, () =>
+    Array.from({ length: b.length + 1 }, () => 0),
+  );
+  for (let i = 0; i <= a.length; i += 1) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j += 1) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      );
+    }
+  }
+  return matrix[a.length][b.length];
+};
+
+const getTemplateScore = (input: string, template: string) => {
+  const source = normalizeText(input);
+  const target = normalizeText(template);
+  if (!source || !target) return 0;
+  if (target.includes(source) || source.includes(target)) return 0.98;
+  const sourceWords = new Set(source.split(" "));
+  const targetWords = target.split(" ");
+  const overlap =
+    targetWords.filter((word) => sourceWords.has(word)).length /
+    Math.max(targetWords.length, 1);
+  const distance = levenshtein(source, target);
+  const ratio = 1 - distance / Math.max(source.length, target.length, 1);
+  return overlap * 0.6 + Math.max(ratio, 0) * 0.4;
+};
+
 // ─────────────────────────────────────────────
 // Bot response
 // ─────────────────────────────────────────────
@@ -216,7 +295,7 @@ function getBotResponse(input: string): string {
       /^(halo|hai|hi|hello|selamat\s(pagi|siang|sore|malam)|assalamu|permisi)/,
     )
   ) {
-    return `Halo juga! 👋 Senang bertemu denganmu!\n\nSaya NEO-Bot, asisten virtual NEO-SARANA. Ada yang ingin kamu tanyakan seputar pengaduan sarana & prasarana sekolah?\n\nKamu bisa bertanya tentang:\n• 📝 Cara membuat laporan\n• 🔍 Cek status laporan\n• 📋 Kategori pengaduan\n• ⏱️ Estimasi waktu penanganan\n• ✅ Syarat membuat laporan`;
+    return `Halo juga! 👋 Senang bertemu denganmu!\n\nSaya NEO-Bot, asisten virtual NEO-SARANA. Saya bisa bantu informasi cepat seputar alur pelaporan sarana/prasarana.\n\nTopik template yang tersedia:\n• 📝 Panduan buat laporan\n• 🔍 Cek status tiket\n• 📋 Daftar kategori laporan\n• ⏱️ Estimasi waktu proses\n• ✅ Syarat laporan valid\n• 📸 Aturan upload foto\n• 🆘 Laporan darurat`;
   }
 
   if (
@@ -230,7 +309,7 @@ function getBotResponse(input: string): string {
       lower.includes("buat") ||
       lower.includes("kirim"))
   ) {
-    return `Berikut langkah-langkah membuat laporan pengaduan di NEO-SARANA:\n\n1️⃣ Pastikan kamu sudah **login** menggunakan akun NIPD\n2️⃣ Pilih tab 📋 **Buat Laporan** di area chat\n3️⃣ Pilih **kategori** pengaduan yang sesuai\n4️⃣ Isi **judul laporan** secara singkat dan jelas\n5️⃣ Masukkan **lokasi** masalah (gedung, lantai, nama ruangan)\n6️⃣ Jelaskan **detail masalah** dengan lengkap\n7️⃣ Upload **foto** sebagai bukti kondisi (opsional)\n8️⃣ Klik **Kirim Laporan**\n\n✅ Setelah dikirim, kamu akan mendapat **nomor tiket** untuk melacak progres penanganan!`;
+    return `Berikut langkah lengkap membuat laporan di NEO-SARANA:\n\n1️⃣ Pastikan kamu sudah **login** dengan akun NIPD\n2️⃣ Buka tab 📋 **Buat Laporan** di area chat\n3️⃣ Pilih **kategori** yang sesuai\n4️⃣ Isi **judul**, **lokasi**, dan **deskripsi** masalah dengan jelas\n5️⃣ Upload **foto before** (opsional tapi sangat disarankan)\n6️⃣ Klik **Kirim Laporan**\n\n✅ Setelah terkirim, kamu mendapat **nomor tiket** untuk tracking.\n\n💡 Untuk melihat penanganan yang sudah selesai dari siswa lain, buka halaman **Public Feed**.`;
   }
 
   if (
@@ -242,7 +321,7 @@ function getBotResponse(input: string): string {
     lower.includes("progres") ||
     (lower.includes("lihat") && lower.includes("laporan"))
   ) {
-    return `Cara mengecek status laporan pengaduan:\n\n🔍 **Melalui Nomor Tiket:**\n• Gunakan nomor tiket yang kamu terima setelah pengiriman\n\n📊 **Status laporan terdiri dari:**\n• 🟡 **Menunggu** — Laporan diterima, menunggu review admin\n• 🔵 **Dalam Progres** — Sedang ditangani oleh tim terkait\n• 🟢 **Selesai** — Perbaikan selesai & dilengkapi foto bukti\n\n💡 Setiap perubahan status akan muncul otomatis sebagai notifikasi!`;
+    return `Cara cek status tiket laporan:\n\n🔍 **Lewat nomor tiket:**\n• Gunakan nomor tiket yang kamu dapat setelah kirim laporan\n\n📂 **Lewat menu aplikasi:**\n• Buka **Riwayat User** untuk melihat riwayat percakapan\n• Buka **Aspirasi Selesai** untuk daftar laporan yang sudah selesai\n\n📊 **Status tiket:**\n• 🟡 **Pending** — menunggu review admin\n• 🔵 **Dalam Progres** — sedang ditangani\n• 🟢 **Selesai** — pekerjaan selesai + bukti foto after\n\n💡 Update status juga muncul lewat notifikasi otomatis.`;
   }
 
   if (
@@ -279,7 +358,26 @@ function getBotResponse(input: string): string {
       lower.includes("saja") &&
       lower.includes("syarat"))
   ) {
-    return `Syarat & ketentuan membuat laporan pengaduan:\n\n✅ **Login Wajib** — Gunakan akun NIPD yang sudah terdaftar\n📸 **Upload Foto** — Opsional, maks. 3 foto kondisi nyata\n📝 **Deskripsi Jelas** — Jelaskan masalah secara detail (min. 20 karakter)\n📍 **Lokasi Tepat** — Cantumkan gedung, lantai, dan nama ruangan\n\n⚠️ **Perhatian:**\nLaporan yang tidak lengkap atau tidak relevan dapat **ditolak** oleh admin.\n\nPastikan laporan kamu valid dan sesuai fakta ya! 🙏`;
+    return `Syarat laporan agar valid dan cepat diproses:\n\n✅ **Login wajib** menggunakan akun NIPD aktif\n📝 **Isi data utama lengkap**: kategori, judul, lokasi, deskripsi\n📸 **Foto pendukung disarankan** agar admin lebih cepat validasi\n📍 **Lokasi harus spesifik** (gedung/lantai/ruang)\n\n⚠️ Laporan yang tidak jelas, duplikat, atau tidak relevan bisa ditolak admin.\n\nSemakin lengkap laporanmu, semakin cepat ditindaklanjuti.`;
+  }
+
+  if (
+    lower.includes("foto") ||
+    lower.includes("gambar") ||
+    lower.includes("before") ||
+    lower.includes("after") ||
+    lower.includes("upload")
+  ) {
+    return `Aturan foto laporan:\n\n📸 **Foto Before (user):**\n• Upload saat membuat laporan\n• Ambil sudut yang jelas, fokus ke kerusakan\n• Hindari blur/gelap agar validasi cepat\n\n🛠️ **Foto After (admin):**\n• Diunggah admin saat status selesai\n• Menjadi bukti hasil penanganan di tiket\n\n💡 Kamu bisa melihat hasil akhir juga di menu **Aspirasi Selesai** dan **Public Feed**.`;
+  }
+
+  if (
+    lower.includes("darurat") ||
+    lower.includes("urgent") ||
+    lower.includes("bahaya") ||
+    lower.includes("prioritas")
+  ) {
+    return `Untuk kondisi darurat (berpotensi membahayakan):\n\n1️⃣ Buat laporan dengan judul yang jelas dan beri kata **DARURAT**\n2️⃣ Pilih kategori paling sesuai (umumnya **Keamanan** atau **Prasarana Fisik**)\n3️⃣ Jelaskan risiko yang terjadi (contoh: kabel terbuka, plafon rawan jatuh)\n4️⃣ Upload foto pendukung\n\n🚨 Laporan darurat diprioritaskan untuk review lebih cepat oleh admin.`;
   }
 
   if (
@@ -302,7 +400,7 @@ function getBotResponse(input: string): string {
     return `Sama-sama! 😊 Senang bisa membantu!\n\nJika ada pertanyaan lain, jangan ragu untuk bertanya kapan saja. Saya selalu siap membantu! 🤝\n\nSemoga masalah sarana & prasaramu segera tertangani! 💪`;
   }
 
-  return `Terima kasih atas pertanyaanmu! 😊\n\nMaaf, saya belum bisa menjawab pertanyaan tersebut secara spesifik. Saya dapat membantumu dengan topik-topik berikut:\n\n• 📝 **Cara membuat laporan** pengaduan\n• 🔍 **Cara mengecek status** laporan\n• 📋 **Kategori** pengaduan yang tersedia\n• ⏱️ **Estimasi waktu** penanganan\n• ✅ **Syarat** membuat laporan\n\nSilakan pilih salah satu topik di atas atau coba ketik ulang pertanyaanmu! 🙏`;
+  return `Terima kasih atas pertanyaanmu! 😊\n\nSaya belum menemukan jawaban spesifik untuk pertanyaan itu. Kamu bisa pilih template berikut agar jawabannya lebih akurat:\n\n• 📝 **Panduan buat laporan**\n• 🔍 **Cek status tiket**\n• 📋 **Daftar kategori laporan**\n• ⏱️ **Estimasi waktu proses**\n• ✅ **Syarat laporan valid**\n• 📸 **Aturan upload foto**\n• 🆘 **Laporan darurat**\n\nKetik bebas juga boleh, nanti saya coba autocorrect ke template terdekat.`;
 }
 
 // ─────────────────────────────────────────────
@@ -399,8 +497,13 @@ export default function ChatPage() {
   const [isSubmittingLaporan, setIsSubmittingLaporan] = useState(false);
   const [isLaporanTyping, setIsLaporanTyping] = useState(false);
   const [laporanSuccess, setLaporanSuccess] = useState<string | null>(null);
-  const [laporanLinkedChatId, setLaporanLinkedChatId] = useState<number | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [aspirasiHistory, setAspirasiHistory] = useState<AspirasiHistory[]>([]);
+  const [selectedLaporanHistoryId, setSelectedLaporanHistoryId] = useState<number | null>(null);
+  const [selectedLaporanItem, setSelectedLaporanItem] = useState<AspirasiHistory | null>(null);
+  const [laporanRating, setLaporanRating] = useState(0);
+  const [laporanFeedbackText, setLaporanFeedbackText] = useState("");
+  const [isSubmittingLaporanFeedback, setIsSubmittingLaporanFeedback] = useState(false);
 
   // ── UI ────────────────────────────────────────
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -418,6 +521,7 @@ export default function ChatPage() {
   const isInitializingRef = useRef(false);
   const pusherRef = useRef<PusherJs | null>(null);
   const channelRef = useRef<ReturnType<PusherJs["subscribe"]> | null>(null);
+  const userChannelRef = useRef<ReturnType<PusherJs["subscribe"]> | null>(null);
 
   // ─────────────────────────────────────────────
   // Auth guard
@@ -444,9 +548,40 @@ export default function ChatPage() {
     if (status === "authenticated") {
       loadChats();
       loadCustomChats();
+      loadAspirasiHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  // ─────────────────────────────────────────────
+  // Pusher for user updates (progress/status/photo) — no refresh needed
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
+    const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+    if (!pusherKey || !pusherCluster) return;
+    if (!session?.user?.id) return;
+
+    if (!pusherRef.current) {
+      pusherRef.current = new PusherJs(pusherKey, { cluster: pusherCluster });
+    }
+
+    const channelName = `user-${session.user.id}`;
+    const channel = pusherRef.current.subscribe(channelName);
+    userChannelRef.current = channel;
+
+    channel.bind("aspirasi-updated", async () => {
+      await loadAspirasiHistory();
+    });
+
+    return () => {
+      channel.unbind("aspirasi-updated");
+      pusherRef.current?.unsubscribe(channelName);
+      userChannelRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, session?.user?.id]);
 
   // ─────────────────────────────────────────────
   // Auto-scroll
@@ -478,14 +613,13 @@ export default function ChatPage() {
         laporanInput,
         fotoPreviews,
         laporanSuccess,
-        laporanLinkedChatId,
         fotoCount: laporanData.foto.length, // Store count for reference
       };
       sessionStorage.setItem("laporan_state", JSON.stringify(state));
     } catch (e) {
       console.error("Failed to save laporan state:", e);
     }
-  }, [laporanStep, laporanData, laporanMessages, laporanInput, fotoPreviews, laporanSuccess, laporanLinkedChatId]);
+  }, [laporanStep, laporanData, laporanMessages, laporanInput, fotoPreviews, laporanSuccess]);
 
   const restoreLaporanState = useCallback(() => {
     try {
@@ -504,7 +638,6 @@ export default function ChatPage() {
         setLaporanInput(state.laporanInput ?? "");
         setFotoPreviews(state.fotoPreviews ?? []);
         setLaporanSuccess(state.laporanSuccess ?? null);
-        setLaporanLinkedChatId(state.laporanLinkedChatId ?? null);
         return true;
       }
     } catch (e) {
@@ -585,12 +718,16 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [status]);
 
-  // ─────────────────────────────────────────────
-  // showTemplates (bot mode)
-  // ─────────────────────────────────────────────
-  const showTemplates =
-    messages.length === 0 ||
-    (messages.length === 1 && messages[0]?.role === "assistant");
+  const templateSuggestions = useMemo(() => {
+    const keyword = input.trim();
+    if (!keyword) return TEMPLATE_QUESTIONS.slice(0, 4);
+    return TEMPLATE_QUESTIONS.map((item) => ({
+      ...item,
+      score: getTemplateScore(keyword, item.query),
+    }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4);
+  }, [input]);
 
   // ─────────────────────────────────────────────
   // Bot Chat Functions
@@ -697,7 +834,14 @@ export default function ChatPage() {
   };
 
   const handleSend = async (overrideText?: string) => {
-    const text = (overrideText ?? input).trim();
+    const originalText = (overrideText ?? input).trim();
+    const bestTemplate = TEMPLATE_QUESTIONS.map((item) => ({
+      ...item,
+      score: getTemplateScore(originalText, item.query),
+    })).sort((a, b) => b.score - a.score)[0];
+    const shouldAutoCorrect =
+      !overrideText && !!bestTemplate && bestTemplate.score >= 0.84;
+    const text = shouldAutoCorrect ? bestTemplate.query : originalText;
     if (!text || !currentChatId || isLoading) return;
     setIsLoading(true);
     if (!overrideText) setInput("");
@@ -720,7 +864,11 @@ export default function ChatPage() {
       const delay = 700 + Math.random() * 600;
       setTimeout(async () => {
         setIsTyping(false);
-        const botKonten = getBotResponse(text);
+        const autoCorrectInfo =
+          shouldAutoCorrect && text !== originalText
+            ? `Saya autocorrect pertanyaanmu ke template terdekat: **${bestTemplate.label}**.\n\n`
+            : "";
+        const botKonten = `${autoCorrectInfo}${getBotResponse(text)}`;
         const botMsg: ChatMessage = { role: "assistant", konten: botKonten };
         setMessages((prev) => [...prev, botMsg]);
         try {
@@ -776,6 +924,123 @@ export default function ChatPage() {
       setCustomChats(data.customChats ?? []);
     } catch (err) {
       console.error("Error loading custom chats:", err);
+    }
+  };
+
+  const loadAspirasiHistory = async () => {
+    try {
+      const res = await fetch("/api/aspirasi");
+      if (!res.ok) return;
+      const data = await res.json();
+      setAspirasiHistory(data.aspirasi ?? []);
+    } catch (err) {
+      console.error("Error loading aspirasi history:", err);
+    }
+  };
+
+  const openLaporanHistory = (item: AspirasiHistory) => {
+    const getSavedThread = (ticket: string): LaporanMsg[] => {
+      try {
+        const raw = localStorage.getItem(LAPORAN_THREADS_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw) as Record<string, LaporanMsg[]>;
+        const thread = parsed[ticket];
+        return Array.isArray(thread) ? thread : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const savedMessages = getSavedThread(item.nomor_tiket);
+    const progressMessages: LaporanMsg[] = (item.progres_updates ?? []).map((p) => ({
+      role: "bot",
+      content: `🔔 **Update Admin** (${new Date(p.tanggal_update).toLocaleString("id-ID")}):\n${p.deskripsi_update}${p.admin?.nama ? `\n\n— ${p.admin.nama}` : ""}`,
+    }));
+
+    const firstProgressTime =
+      item.progres_updates && item.progres_updates.length > 0
+        ? item.progres_updates[0].tanggal_update
+        : item.tanggal_input;
+    const timelineMessages: LaporanMsg[] = [
+      {
+        role: "bot",
+        content: `🧾 Tiket **${item.nomor_tiket}** berhasil dibuat pada ${new Date(item.tanggal_input).toLocaleString("id-ID")} dan menunggu konfirmasi admin.`,
+      },
+      ...(item.status !== "pending"
+        ? [
+            {
+              role: "bot" as const,
+              content: `✅ Tiket dikonfirmasi admin pada ${new Date(firstProgressTime).toLocaleString("id-ID")} dan masuk tahap **dalam proses**.`,
+            },
+          ]
+        : []),
+    ];
+
+    const completionMessages: LaporanMsg[] =
+      item.status === "selesai"
+        ? [
+            {
+              role: "bot",
+              content: `📋 **Rangkuman Laporan**\n\n🎫 **Nomor Tiket:** ${item.nomor_tiket}\n📝 **Judul:** ${item.judul}\n📍 **Lokasi:** ${item.lokasi}\n📌 **Status:** ${item.status}`,
+            },
+            ...(item.foto_before
+              ? [
+                  {
+                    role: "bot" as const,
+                    content: "📷 **Foto Before** (foto awal dari pelapor):",
+                    imageUrl: item.foto_before,
+                  },
+                ]
+              : []),
+            ...(item.foto_after
+              ? [
+                  {
+                    role: "bot" as const,
+                    content: "✅ **Foto After** (hasil perbaikan dari admin):",
+                    imageUrl: item.foto_after,
+                  },
+                ]
+              : []),
+          ]
+        : [];
+
+    setSelectedLaporanHistoryId(item.id);
+    setSelectedLaporanItem(item);
+    setLaporanRating(item.rating ?? 0);
+    setLaporanFeedbackText(item.feedback ?? "");
+    setChatMode("laporan");
+    setLaporanStep(-1);
+    setLaporanData({
+      kategori: "",
+      judul: item.judul,
+      lokasi: item.lokasi,
+      deskripsi: item.deskripsi,
+      foto: [],
+    });
+    const merged =
+      savedMessages.length > 0
+        ? [...savedMessages, ...timelineMessages, ...progressMessages, ...completionMessages]
+        : [...timelineMessages, ...progressMessages, ...completionMessages];
+    const deduped = merged.filter(
+      (msg, idx, arr) =>
+        arr.findIndex(
+          (x) => x.content === msg.content && (x.imageUrl ?? "") === (msg.imageUrl ?? ""),
+        ) === idx,
+    );
+    setLaporanMessages(deduped);
+    setLaporanSuccess(item.nomor_tiket);
+    setFotoPreviews([]);
+    setLaporanInput("");
+  };
+
+  const saveLaporanThread = (ticket: string, msgs: LaporanMsg[]) => {
+    try {
+      const raw = localStorage.getItem(LAPORAN_THREADS_KEY);
+      const parsed = raw ? (JSON.parse(raw) as Record<string, LaporanMsg[]>) : {};
+      parsed[ticket] = msgs;
+      localStorage.setItem(LAPORAN_THREADS_KEY, JSON.stringify(parsed));
+    } catch (err) {
+      console.error("Failed to save laporan thread:", err);
     }
   };
 
@@ -913,6 +1178,10 @@ export default function ChatPage() {
   // Laporan Functions
   // ─────────────────────────────────────────────
   const initLaporanMode = () => {
+    setSelectedLaporanHistoryId(null);
+    setSelectedLaporanItem(null);
+    setLaporanRating(0);
+    setLaporanFeedbackText("");
     setLaporanStep(-1);
     setLaporanData({
       kategori: "",
@@ -930,7 +1199,6 @@ export default function ChatPage() {
     setLaporanInput("");
     setFotoPreviews([]);
     setLaporanSuccess(null);
-    setLaporanLinkedChatId(null);
     setIsLaporanTyping(false);
   };
 
@@ -1077,15 +1345,40 @@ export default function ChatPage() {
 
       const nomor = data.nomor_tiket ?? ticket;
       setLaporanSuccess(nomor);
-      setLaporanLinkedChatId(data.custom_chat_id ?? null);
       setLaporanMessages((prev) => [
         ...prev,
+        ...(data.aspirasi?.foto_before
+          ? [
+              {
+                role: "bot" as const,
+                content: "📷 Foto laporan kamu sudah terkirim ke admin:",
+                imageUrl: data.aspirasi.foto_before as string,
+              },
+            ]
+          : []),
         {
           role: "bot",
-          content: `🎉 **Laporan berhasil dikirim!**\n\nNomor tiket kamu:\n**${nomor}**\n\nRiwayat percakapan laporan ini sudah disimpan. Kalau admin mulai menindaklanjuti, kamu bisa lanjut chat dari thread tiket yang sama.\n\nTerima kasih telah melaporkan! 🙏`,
+          content: `🎉 **Laporan berhasil dikirim!**\n\nNomor tiket kamu:\n**${nomor}**\n\nRiwayat percakapan laporan ini sudah disimpan dan tetap berada di tab **Buat Laporan**.\n\nTerima kasih telah melaporkan! 🙏`,
         },
       ]);
-      await loadCustomChats();
+      const finalMessages: LaporanMsg[] = [
+        ...laporanMessages,
+        ...(data.aspirasi?.foto_before
+          ? [
+              {
+                role: "bot",
+                content: "📷 Foto laporan kamu sudah terkirim ke admin:",
+                imageUrl: data.aspirasi.foto_before as string,
+              },
+            ]
+          : []),
+        {
+          role: "bot",
+          content: `🎉 **Laporan berhasil dikirim!**\n\nNomor tiket kamu:\n**${nomor}**\n\nRiwayat percakapan laporan ini sudah disimpan dan tetap berada di tab **Buat Laporan**.\n\nTerima kasih telah melaporkan! 🙏`,
+        },
+      ];
+      saveLaporanThread(nomor, finalMessages);
+      await loadAspirasiHistory();
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 3500);
       
@@ -1105,13 +1398,77 @@ export default function ChatPage() {
     }
   };
 
-  const openLinkedLaporanChat = async () => {
-    if (!laporanLinkedChatId) return;
-    await loadCustomChats();
-    await handleSelectCustomChat(laporanLinkedChatId);
+  const handleLaporanFollowUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = laporanInput.trim();
+    if (!text) return;
+    setLaporanInput("");
+    setLaporanMessages((prev) => [...prev, { role: "user", content: text }]);
+    await addBotLaporanMsg(
+      `Pesanmu terkait laporan **${laporanSuccess ?? ""}** sudah dicatat.\n\nKamu bisa lanjutkan percakapan di tab **Buat Laporan** ini kapan saja.`,
+      350,
+    );
+    if (laporanSuccess) {
+      setLaporanMessages((prev) => {
+        saveLaporanThread(laporanSuccess, prev);
+        return prev;
+      });
+    }
+  };
+
+  const handleSubmitLaporanFeedback = async () => {
+    if (
+      !selectedLaporanItem ||
+      selectedLaporanItem.status !== "selesai" ||
+      laporanRating < 1 ||
+      selectedLaporanItem.rating
+    ) {
+      return;
+    }
+    setIsSubmittingLaporanFeedback(true);
+    try {
+      const res = await fetch(`/api/aspirasi/${selectedLaporanItem.id}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rating: laporanRating,
+          feedback: laporanFeedbackText.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error("Gagal menyimpan feedback");
+      setSelectedLaporanItem((prev) =>
+        prev ? { ...prev, rating: laporanRating, feedback: laporanFeedbackText.trim() || null } : prev,
+      );
+      setLaporanMessages((prev) => {
+        const thanksMsg = `Terima kasih! ⭐ Penilaian ${laporanRating}/5 dan feedback kamu sudah tersimpan.`;
+        const alreadyExists = prev.some((m) => m.content === thanksMsg);
+        if (alreadyExists) return prev;
+        return [
+          ...prev,
+          {
+            role: "bot",
+            content: thanksMsg,
+          },
+        ];
+      });
+      await loadAspirasiHistory();
+    } catch (err) {
+      setLaporanMessages((prev) => [
+        ...prev,
+        {
+          role: "bot",
+          content: `❌ Gagal menyimpan rating/feedback. Coba lagi ya.`,
+        },
+      ]);
+      console.error("Error submitting laporan feedback:", err);
+    } finally {
+      setIsSubmittingLaporanFeedback(false);
+    }
   };
 
   const handleLogout = async () => {
+    const ok = window.confirm("Yakin ingin logout?");
+    if (!ok) return;
     await signOut({ redirect: true, callbackUrl: "/login" });
   };
 
@@ -1179,7 +1536,6 @@ export default function ChatPage() {
               </span>
             )}
           </Link>
-
           {/* ── New Chat button ── */}
           <button
             onClick={createNewChat}
@@ -1189,6 +1545,39 @@ export default function ChatPage() {
             <Plus className="w-5 h-5" />
             {!isSidebarCollapsed && <span className="font-medium">Chat Baru</span>}
           </button>
+          <div className="mt-3 mb-2 shrink-0">
+            {!isSidebarCollapsed && (
+              <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Navigasi Cepat
+              </p>
+            )}
+            <div className="grid gap-2">
+            <Link
+              href="/riwayat"
+              className={`rounded-xl border transition-all ${
+                isSidebarCollapsed
+                  ? "flex items-center justify-center p-2.5 border-indigo-400/40 bg-indigo-500/30 text-indigo-100 hover:bg-indigo-500/40"
+                  : "flex items-center gap-2 p-2.5 border-indigo-400/40 bg-indigo-500/30 text-indigo-100 hover:bg-indigo-500/40"
+              }`}
+              title="Riwayat User"
+            >
+              <History className="w-4 h-4" />
+              {!isSidebarCollapsed && <span className="text-sm font-medium">Riwayat User</span>}
+            </Link>
+            <Link
+              href="/aspirasi-selesai"
+              className={`rounded-xl border transition-all ${
+                isSidebarCollapsed
+                  ? "flex items-center justify-center p-2.5 border-emerald-400/40 bg-emerald-500/25 text-emerald-100 hover:bg-emerald-500/35"
+                  : "flex items-center gap-2 p-2.5 border-emerald-400/40 bg-emerald-500/25 text-emerald-100 hover:bg-emerald-500/35"
+              }`}
+              title="Aspirasi Selesai"
+            >
+              <CheckCircle className="w-4 h-4" />
+              {!isSidebarCollapsed && <span className="text-sm font-medium">Aspirasi Selesai</span>}
+            </Link>
+            </div>
+          </div>
 
           {/* ── Unified History ── */}
           <div className="mt-4 shrink-0">
@@ -1221,7 +1610,14 @@ export default function ChatPage() {
                 updatedAt: c.diperbarui_pada,
                 status: c.status,
               }));
-              const allItems = [...botItems, ...customItems].sort(
+              const laporanItems = aspirasiHistory.map((a) => ({
+                type: "laporan" as const,
+                id: a.id,
+                judul: `${a.nomor_tiket} - ${a.judul}`,
+                updatedAt: a.tanggal_input,
+                status: a.status,
+              }));
+              const allItems = [...botItems, ...customItems, ...laporanItems].sort(
                 (a, b) =>
                   new Date(b.updatedAt).getTime() -
                   new Date(a.updatedAt).getTime(),
@@ -1239,17 +1635,24 @@ export default function ChatPage() {
                 const isActive =
                   item.type === "bot"
                     ? chatMode === "bot" && currentChatId === item.id
-                    : chatMode === "custom" && selectedCustomChatId === item.id;
+                    : item.type === "custom"
+                      ? chatMode === "custom" && selectedCustomChatId === item.id
+                      : chatMode === "laporan" && selectedLaporanHistoryId === item.id;
 
                 return (
                   <button
                     key={`${item.type}-${item.id}`}
                     onClick={() => {
                       if (item.type === "bot") {
+                        setSelectedLaporanHistoryId(null);
                         setChatMode("bot");
                         setCurrentChatId(item.id);
-                      } else {
+                      } else if (item.type === "custom") {
+                        setSelectedLaporanHistoryId(null);
                         handleSelectCustomChat(item.id);
+                      } else {
+                        const selected = aspirasiHistory.find((a) => a.id === item.id);
+                        if (selected) openLaporanHistory(selected);
                       }
                       if (isMobileViewport) setIsSidebarOpen(false);
                     }}
@@ -1267,13 +1670,13 @@ export default function ChatPage() {
                   >
                     {/* Icon type */}
                     <span className="shrink-0 text-[11px]">
-                      {item.type === "bot" ? "🤖" : "💬"}
+                      {item.type === "bot" ? "🤖" : item.type === "custom" ? "💬" : "📋"}
                     </span>
                     {!isSidebarCollapsed && (
                       <span className="truncate flex-1 text-[13px]">{item.judul}</span>
                     )}
                     <div className="flex items-center gap-1 shrink-0">
-                      {!isSidebarCollapsed && item.type === "custom" && item.status && (
+                      {!isSidebarCollapsed && item.type !== "bot" && item.status && (
                         <StatusBadge status={item.status} size="xs" />
                       )}
                       {!isSidebarCollapsed && item.type === "bot" && (
@@ -1471,26 +1874,24 @@ export default function ChatPage() {
                 </div>
               ))}
 
-              {/* Template questions */}
-              {showTemplates && (
-                <div className="pl-11 animate-fade-in">
-                  <p className="text-xs text-slate-500 mb-3 font-medium uppercase tracking-wider">
-                    Pilih pertanyaan
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {TEMPLATE_QUESTIONS.map((tq) => (
-                      <button
-                        key={tq.id}
-                        onClick={() => handleSend(tq.query)}
-                        disabled={isLoading}
-                        className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-800/60 border border-white/10 text-slate-300 hover:text-white hover:bg-indigo-600/20 hover:border-indigo-500/40 transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {tq.label}
-                      </button>
-                    ))}
-                  </div>
+              {/* Template questions (always visible in NEO-Bot tab) */}
+              <div className="pl-11 animate-fade-in">
+                <p className="text-xs text-slate-500 mb-3 font-medium uppercase tracking-wider">
+                  Template Pertanyaan NEO-Bot
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {TEMPLATE_QUESTIONS.map((tq) => (
+                    <button
+                      key={tq.id}
+                      onClick={() => handleSend(tq.query)}
+                      disabled={isLoading}
+                      className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-800/60 border border-white/10 text-slate-300 hover:text-white hover:bg-indigo-600/20 hover:border-indigo-500/40 transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {tq.label}
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
 
               {isTyping && <TypingIndicator />}
               <div ref={messagesEndRef} />
@@ -1525,6 +1926,17 @@ export default function ChatPage() {
                         : "bg-slate-800/80 text-slate-200 border border-white/5 rounded-tl-sm shadow-sm"
                     }`}
                   >
+                    {msg.imageUrl && (
+                      <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={msg.imageUrl}
+                          alt="Lampiran laporan"
+                          className="max-w-full max-h-64 object-cover w-full cursor-pointer"
+                          onClick={() => window.open(msg.imageUrl!, "_blank")}
+                        />
+                      </div>
+                    )}
                     <MessageContent text={msg.content} />
                   </div>
                 </div>
@@ -1798,30 +2210,46 @@ export default function ChatPage() {
           <div className="max-w-3xl mx-auto">
             {/* ── Bot input ── */}
             {chatMode === "bot" && (
-              <form onSubmit={handleFormSubmit} className="relative group">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={
-                    currentChatId
-                      ? "Ketik pesanmu ke NEO-Bot..."
-                      : "Menginisialisasi chat..."
-                  }
-                  disabled={!currentChatId || isLoading}
-                  autoComplete="off"
-                  className="w-full bg-slate-800/60 border border-white/10 rounded-2xl pl-5 pr-14 py-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 focus:bg-slate-800 transition-all shadow-xl backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed text-[15px]"
-                />
-                <button
-                  type="submit"
-                  disabled={!input.trim() || !currentChatId || isLoading}
-                  className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:hover:bg-indigo-600 transition-all hover:scale-105 active:scale-95"
-                  title="Kirim pesan"
-                >
-                  <Send className="w-4 h-4 ml-0.5" />
-                </button>
-              </form>
+              <div className="space-y-2">
+                <form onSubmit={handleFormSubmit} className="relative group">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={
+                      currentChatId
+                        ? "Ketik pesanmu ke NEO-Bot..."
+                        : "Menginisialisasi chat..."
+                    }
+                    disabled={!currentChatId || isLoading}
+                    autoComplete="off"
+                    className="w-full bg-slate-800/60 border border-white/10 rounded-2xl pl-5 pr-14 py-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 focus:bg-slate-800 transition-all shadow-xl backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed text-[15px]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || !currentChatId || isLoading}
+                    className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:hover:bg-indigo-600 transition-all hover:scale-105 active:scale-95"
+                    title="Kirim pesan"
+                  >
+                    <Send className="w-4 h-4 ml-0.5" />
+                  </button>
+                </form>
+                <div className="flex flex-wrap items-center gap-2 px-1">
+                  <span className="text-[11px] text-slate-500">Auto-correct template:</span>
+                  {templateSuggestions.map((item) => (
+                    <button
+                      key={`suggest-${item.id}`}
+                      type="button"
+                      disabled={!currentChatId || isLoading}
+                      onClick={() => handleSend(item.query)}
+                      className="rounded-full border border-indigo-400/25 bg-indigo-500/10 px-2.5 py-1 text-[11px] text-indigo-200 transition hover:bg-indigo-500/20 disabled:opacity-50"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* ── Laporan input (changes per step) ── */}
@@ -1979,14 +2407,69 @@ export default function ChatPage() {
                 {/* Success: reset button */}
                 {laporanSuccess && (
                   <div className="space-y-3">
-                    {laporanLinkedChatId && (
-                      <button
-                        onClick={openLinkedLaporanChat}
-                        className="w-full py-3.5 rounded-2xl bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/30 hover:border-emerald-400/40 text-emerald-300 hover:text-white font-medium text-sm transition-all flex items-center justify-center gap-2"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                        Buka Percakapan Tiket Ini
-                      </button>
+                    {selectedLaporanItem?.status !== "selesai" ? (
+                      <form onSubmit={handleLaporanFollowUpSubmit} className="relative group">
+                        <input
+                          type="text"
+                          value={laporanInput}
+                          onChange={(e) => setLaporanInput(e.target.value)}
+                          placeholder="Lanjutkan percakapan terkait laporan ini..."
+                          className="w-full bg-slate-800/60 border border-white/10 rounded-2xl pl-5 pr-14 py-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 focus:bg-slate-800 transition-all shadow-xl text-[15px]"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!laporanInput.trim()}
+                          className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center rounded-xl bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-40 transition-all"
+                        >
+                          <Send className="w-4 h-4 ml-0.5" />
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 space-y-3">
+                        <p className="text-sm text-emerald-200">
+                          Laporan sudah <strong>selesai</strong>. Silakan beri rating dan feedback.
+                        </p>
+                        {selectedLaporanItem?.rating ? (
+                          <p className="text-xs text-emerald-300">
+                            Rating & feedback sudah dikirim ({selectedLaporanItem.rating}/5).
+                          </p>
+                        ) : null}
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button
+                              key={n}
+                              onClick={() => setLaporanRating(n)}
+                              disabled={!!selectedLaporanItem?.rating}
+                              className={`px-3 py-1.5 rounded-lg text-sm border transition ${
+                                laporanRating >= n
+                                  ? "bg-amber-500/20 border-amber-400/40 text-amber-300"
+                                  : "bg-slate-800/60 border-white/10 text-slate-400"
+                              } ${selectedLaporanItem?.rating ? "opacity-60 cursor-not-allowed" : ""}`}
+                            >
+                              {n}★
+                            </button>
+                          ))}
+                        </div>
+                        <textarea
+                          value={laporanFeedbackText}
+                          onChange={(e) => setLaporanFeedbackText(e.target.value)}
+                          placeholder="Tulis feedback kamu (opsional)..."
+                          rows={3}
+                          disabled={!!selectedLaporanItem?.rating}
+                          className="w-full bg-slate-800/60 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 text-sm resize-none"
+                        />
+                        <button
+                          onClick={handleSubmitLaporanFeedback}
+                          disabled={laporanRating < 1 || isSubmittingLaporanFeedback || !!selectedLaporanItem?.rating}
+                          className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                          {selectedLaporanItem?.rating
+                            ? "Rating & Feedback Sudah Terkirim"
+                            : isSubmittingLaporanFeedback
+                              ? "Menyimpan..."
+                              : "Kirim Rating & Feedback"}
+                        </button>
+                      </div>
                     )}
                     <button
                       onClick={initLaporanMode}

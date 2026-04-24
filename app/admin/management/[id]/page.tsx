@@ -169,6 +169,15 @@ const STATUS_OPTIONS = [
     active: "bg-emerald-500/15 border-emerald-500/50 text-emerald-300",
     idle: "bg-white/5 border-white/10 text-slate-400 hover:border-emerald-500/30 hover:text-emerald-300",
   },
+  {
+    key: "ditolak",
+    label: "Ditolak",
+    desc: "Laporan ditolak admin",
+    dot: "bg-red-400",
+    ring: "ring-red-500/40",
+    active: "bg-red-500/15 border-red-500/50 text-red-300",
+    idle: "bg-white/5 border-white/10 text-slate-400 hover:border-red-500/30 hover:text-red-300",
+  },
 ];
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -183,6 +192,9 @@ export default function ManagementDetailPage() {
 
   // Status
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectError, setRejectError] = useState<string | null>(null);
 
   // Progress update
   const [progressText, setProgressText] = useState("");
@@ -255,6 +267,7 @@ export default function ManagementDetailPage() {
 
   const handleSubmitProgress = async () => {
     if (!progressText.trim() || !aspirasi) return;
+    if (aspirasi.status === "selesai" || aspirasi.status === "ditolak") return;
     setSubmittingProgress(true);
     try {
       const res = await fetch(`/api/aspirasi/${aspirasi.id}/progress`, {
@@ -287,6 +300,7 @@ export default function ManagementDetailPage() {
 
   const handleUploadAfterPhoto = async () => {
     if (!afterPhotoFile || !aspirasi) return;
+    if (aspirasi.status === "selesai" || aspirasi.status === "ditolak") return;
     setUploadingAfterPhoto(true);
     try {
       const fd = new FormData();
@@ -310,15 +324,25 @@ export default function ManagementDetailPage() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     if (!aspirasi || aspirasi.status === newStatus) return;
+    if (newStatus === "ditolak") {
+      setRejectReason("");
+      setRejectError(null);
+      setRejectModalOpen(true);
+      return;
+    }
     setUpdatingStatus(true);
     try {
       const res = await fetch(`/api/aspirasi/${aspirasi.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          status: newStatus,
+          alasan_penolakan: undefined,
+        }),
       });
       if (res.ok) {
         setAspirasi((prev) => prev ? { ...prev, status: newStatus } : prev);
+        await fetchAspirasi();
       }
     } finally {
       setUpdatingStatus(false);
@@ -357,9 +381,128 @@ export default function ManagementDetailPage() {
   }
 
   const isSelesai = aspirasi.status === "selesai";
+  const isDitolak = aspirasi.status === "ditolak";
+  const isLocked = isSelesai || isDitolak;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 pb-16">
+      {/* Reject modal */}
+      {rejectModalOpen && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setRejectModalOpen(false);
+              setRejectError(null);
+            }
+          }}
+        >
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900/95 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-white/10">
+              <div>
+                <p className="text-white font-bold">Tolak Laporan</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Alasan wajib diisi agar user memahami kenapa laporannya ditolak.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setRejectModalOpen(false);
+                  setRejectError(null);
+                }}
+                className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
+                aria-label="Tutup"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-3">
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Alasan penolakan
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => {
+                  setRejectReason(e.target.value);
+                  setRejectError(null);
+                }}
+                rows={4}
+                placeholder="Contoh: Laporan kurang jelas. Mohon lengkapi lokasi dan foto before yang menunjukkan kerusakan."
+                className="w-full bg-slate-800/60 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500/40 transition-all resize-none text-sm"
+              />
+              {rejectError && (
+                <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                  {rejectError}
+                </div>
+              )}
+
+              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  Preview rangkuman untuk user
+                </p>
+                <p className="text-xs text-slate-200 leading-relaxed break-words">
+                  ❌ Laporan ditolak | Tiket: {aspirasi.nomor_tiket} | Judul:{" "}
+                  {aspirasi.judul} | Alasan:{" "}
+                  {rejectReason.trim() || "(alasan belum diisi)"} | Silakan
+                  perbaiki lalu kirim ulang via tab Buat Laporan.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-white/10 flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <button
+                onClick={() => {
+                  setRejectModalOpen(false);
+                  setRejectError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-semibold transition-all"
+              >
+                Batal
+              </button>
+              <button
+                onClick={async () => {
+                  if (!aspirasi) return;
+                  const reason = rejectReason.trim();
+                  if (!reason) {
+                    setRejectError("Alasan penolakan wajib diisi.");
+                    return;
+                  }
+                  setUpdatingStatus(true);
+                  try {
+                    const res = await fetch(`/api/aspirasi/${aspirasi.id}/status`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        status: "ditolak",
+                        alasan_penolakan: reason,
+                      }),
+                    });
+                    if (!res.ok) {
+                      const msg = await res.json().catch(() => ({}));
+                      setRejectError(msg?.error ?? "Gagal menolak laporan.");
+                      return;
+                    }
+                    setRejectModalOpen(false);
+                    setRejectReason("");
+                    setRejectError(null);
+                    await fetchAspirasi();
+                  } finally {
+                    setUpdatingStatus(false);
+                  }
+                }}
+                disabled={updatingStatus}
+                className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-slate-700 text-white text-sm font-semibold transition-all"
+              >
+                {updatingStatus ? "Memproses..." : "Tolak Laporan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
@@ -461,15 +604,24 @@ export default function ManagementDetailPage() {
                   return (
                     <button
                       key={opt.key}
-                      onClick={() => handleUpdateStatus(opt.key)}
-                      disabled={updatingStatus || isActive}
+                      onClick={() => {
+                        if (isLocked) return;
+                        if (opt.key === "ditolak") {
+                          setRejectReason("");
+                          setRejectError(null);
+                          setRejectModalOpen(true);
+                          return;
+                        }
+                        handleUpdateStatus(opt.key);
+                      }}
+                      disabled={updatingStatus || isActive || isLocked}
                       className={[
                         "relative flex flex-col items-start gap-1 px-4 py-3.5 rounded-xl border text-left transition-all duration-200",
                         "disabled:cursor-default",
                         isActive
                           ? `${opt.active} ring-2 ${opt.ring} shadow-sm`
                           : opt.idle,
-                        !isActive && !updatingStatus ? "hover:scale-[1.02] active:scale-[0.98]" : "",
+                        !isActive && !updatingStatus && !isLocked ? "hover:scale-[1.02] active:scale-[0.98]" : "",
                       ].join(" ")}
                     >
                       <div className="flex items-center gap-2 w-full">
@@ -487,6 +639,25 @@ export default function ManagementDetailPage() {
                   );
                 })}
               </div>
+              {isDitolak && (
+                <p className="mt-3 text-xs text-slate-500">
+                  Status <span className="text-red-300 font-semibold">Ditolak</span> akan mengirim notifikasi ke user beserta alasan penolakan.
+                </p>
+              )}
+              {isSelesai && (
+                <p className="mt-3 text-xs text-slate-500">
+                  Status <span className="text-emerald-300 font-semibold">Selesai</span> sudah final. Tidak bisa update status lagi.
+                </p>
+              )}
+              {isLocked && (
+                <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300">
+                  Aksi dikunci karena laporan sudah{" "}
+                  <span className={isDitolak ? "text-red-300 font-semibold" : "text-emerald-300 font-semibold"}>
+                    {isDitolak ? "ditolak" : "selesai"}
+                  </span>
+                  .
+                </div>
+              )}
             </section>
 
             {/* Progress Update Form */}
@@ -502,8 +673,18 @@ export default function ManagementDetailPage() {
                   onChange={(e) => setProgressText(e.target.value)}
                   placeholder="Tuliskan update progress pengaduan ini secara detail..."
                   rows={4}
-                  className="w-full bg-slate-800/60 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all resize-none text-sm"
+                  disabled={isLocked}
+                  className="w-full bg-slate-800/60 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all resize-none text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 />
+                {isLocked && (
+                  <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300">
+                    Tidak bisa mengisi update progres karena laporan sudah{" "}
+                    <span className={isDitolak ? "text-red-300 font-semibold" : "text-emerald-300 font-semibold"}>
+                      {isDitolak ? "ditolak" : "selesai"}
+                    </span>
+                    .
+                  </div>
+                )}
 
                 {/* Progress photo preview */}
                 {progressPhotoPreview && (
@@ -540,7 +721,7 @@ export default function ManagementDetailPage() {
                   />
                   <button
                     onClick={() => progressFileRef.current?.click()}
-                    disabled={uploadingProgressPhoto || !!progressPhotoPreview}
+                    disabled={isLocked || uploadingProgressPhoto || !!progressPhotoPreview}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-white/10 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ImagePlus className="w-4 h-4" />
@@ -549,7 +730,7 @@ export default function ManagementDetailPage() {
 
                   <button
                     onClick={handleSubmitProgress}
-                    disabled={!progressText.trim() || submittingProgress || uploadingProgressPhoto}
+                    disabled={isLocked || !progressText.trim() || submittingProgress || uploadingProgressPhoto}
                     className="flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed sm:ml-auto"
                   >
                     {submittingProgress ? (
@@ -572,6 +753,15 @@ export default function ManagementDetailPage() {
               <p className="text-xs text-slate-500 mb-4">
                 Upload foto hasil penyelesaian pengaduan sebagai bukti perbaikan.
               </p>
+              {isLocked && (
+                <div className="mb-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300">
+                  Upload foto after dikunci karena laporan sudah{" "}
+                  <span className={isDitolak ? "text-red-300 font-semibold" : "text-emerald-300 font-semibold"}>
+                    {isDitolak ? "ditolak" : "selesai"}
+                  </span>
+                  .
+                </div>
+              )}
 
               {aspirasi.foto_after ? (
                 <div className="space-y-3">
@@ -612,7 +802,7 @@ export default function ManagementDetailPage() {
                   </div>
                   <button
                     onClick={handleUploadAfterPhoto}
-                    disabled={uploadingAfterPhoto}
+                    disabled={isLocked || uploadingAfterPhoto}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed"
                   >
                     {uploadingAfterPhoto ? (
@@ -625,7 +815,10 @@ export default function ManagementDetailPage() {
                 </div>
               ) : (
                 <button
-                  onClick={() => afterFileRef.current?.click()}
+                  onClick={() => {
+                    if (isLocked) return;
+                    afterFileRef.current?.click();
+                  }}
                   className="mt-2 flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-white/10 hover:border-emerald-500/40 text-slate-500 hover:text-emerald-400 text-sm font-medium transition-all w-full justify-center hover:bg-emerald-500/5"
                 >
                   <Upload className="w-4 h-4" />
