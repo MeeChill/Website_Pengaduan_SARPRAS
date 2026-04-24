@@ -44,7 +44,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const { status, alasan_penolakan } = await request.json();
+    const { status, alasan_penolakan, keterangan_selesai } = await request.json();
     
     if (!['pending', 'dalam_progres', 'selesai', 'ditolak'].includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
@@ -52,11 +52,19 @@ export async function PATCH(
     if (status === 'ditolak' && !String(alasan_penolakan ?? '').trim()) {
       return NextResponse.json({ error: 'Alasan penolakan wajib diisi' }, { status: 400 });
     }
-
     const existing = await prisma.aspirasi.findUnique({
       where: { id: parseInt(id) },
-      select: { status: true },
+      select: {
+        id: true,
+        user_id: true,
+        nomor_tiket: true,
+        judul: true,
+        foto_after: true,
+        status: true,
+        custom_chat: { select: { id: true } },
+      },
     });
+    
     if (!existing) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -66,27 +74,23 @@ export async function PATCH(
         { status: 409 }
       );
     }
-
-    const before = await prisma.aspirasi.findUnique({
-      where: { id: parseInt(id) },
-      select: {
-        id: true,
-        user_id: true,
-        nomor_tiket: true,
-        judul: true,
-        custom_chat: { select: { id: true } },
-      },
-    });
-    if (!before) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    
+    if (status === 'selesai' && !String(keterangan_selesai ?? '').trim()) {
+      return NextResponse.json({ error: 'Keterangan penyelesaian wajib diisi' }, { status: 400 });
     }
+    if (status === 'selesai' && !existing.foto_after) {
+      return NextResponse.json({ error: 'Foto after wajib diupload sebelum menyelesaikan laporan' }, { status: 400 });
+    }
+
+    const before = existing;
 
     const aspirasi = await prisma.aspirasi.update({
       where: { id: parseInt(id) },
       data: { 
         status,
         tanggal_mulai: status === 'dalam_progres' ? new Date() : undefined,
-        tanggal_selesai: status === 'selesai' ? new Date() : undefined
+        tanggal_selesai: status === 'selesai' ? new Date() : undefined,
+        // keterangan_selesai: status === 'selesai' ? String(keterangan_selesai ?? '').trim() : undefined
       },
       include: {
         custom_chat: {
@@ -142,6 +146,15 @@ export async function PATCH(
         },
       });
     }
+    if (status === 'selesai') {
+      await prisma.progresUpdate.create({
+        data: {
+          aspirasi_id: parseInt(id),
+          admin_id: parseInt(session.user.id),
+          deskripsi_update: `✅ Laporan **SELESAI**\n\nTiket: ${before.nomor_tiket}\nJudul: ${before.judul}\n\nKeterangan penyelesaian: ${String(keterangan_selesai ?? '').trim()}` // TODO: Enable after migration,
+        },
+      });
+    }
 
     if (before.custom_chat?.id) {
       const chatMessage = await prisma.customChatMessage.create({
@@ -152,6 +165,8 @@ export async function PATCH(
           konten:
             status === 'ditolak'
               ? rejection!.detail
+              : status === 'selesai'
+              ? `✅ Update tiket ${before.nomor_tiket}: status laporan diubah menjadi **SELESAI**.\n\nKeterangan penyelesaian: ${String(keterangan_selesai ?? '').trim()}` // TODO: Enable after migration
               : `Update tiket ${before.nomor_tiket}: status laporan diubah menjadi ${statusLabel}.`,
         }
       });

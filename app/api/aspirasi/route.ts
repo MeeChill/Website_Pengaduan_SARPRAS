@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
+      console.error('Unauthorized access to /api/aspirasi - No valid session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -52,8 +53,18 @@ export async function POST(request: NextRequest) {
     const fotoFiles = formData.getAll('foto') as File[];
     const riwayatChatRaw = formData.get('riwayat_chat') as string | null;
 
+    console.log('Received aspirasi submission:', {
+      user_id: session.user.id,
+      judul: judul?.substring(0, 50) + '...',
+      lokasi: lokasi?.substring(0, 50) + '...',
+      deskripsi_length: deskripsi?.length,
+      nomor_tiket,
+      foto_count: fotoFiles.length
+    });
+
     // Validate required fields
     if (!judul || !lokasi || !deskripsi || !nomor_tiket) {
+      console.error('Missing required fields', { judul, lokasi, deskripsi, nomor_tiket });
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -61,16 +72,25 @@ export async function POST(request: NextRequest) {
     let fotoBeforeUrl: string | null = null;
     
     if (fotoFiles.length > 0) {
-      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-      await mkdir(uploadDir, { recursive: true });
+      try {
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+        await mkdir(uploadDir, { recursive: true });
 
-      const firstFile = fotoFiles[0];
-      const buffer = Buffer.from(await firstFile.arrayBuffer());
-      const filename = `${Date.now()}-${firstFile.name}`;
-      const filepath = path.join(uploadDir, filename);
-      
-      await writeFile(filepath, buffer);
-      fotoBeforeUrl = `/uploads/${filename}`;
+        const firstFile = fotoFiles[0];
+        console.log('Uploading file:', firstFile.name, 'Size:', firstFile.size, 'Type:', firstFile.type);
+        
+        const buffer = Buffer.from(await firstFile.arrayBuffer());
+        const filename = `${Date.now()}-${firstFile.name}`;
+        const filepath = path.join(uploadDir, filename);
+        
+        await writeFile(filepath, buffer);
+        fotoBeforeUrl = `/uploads/${filename}`;
+        console.log('File uploaded successfully:', filename);
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        // Continue without photo if upload fails
+        fotoBeforeUrl = null;
+      }
     }
 
     // Get or create default category
@@ -104,10 +124,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate user exists before creating aspirasi
+    console.log('Validating user ID:', session.user.id);
+    const userId = parseInt(session.user.id);
+    if (isNaN(userId)) {
+      return NextResponse.json(
+        { error: 'Invalid user ID format' },
+        { status: 400 }
+      );
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true }
+    });
+
+    if (!existingUser) {
+      console.error('User not found in database:', userId);
+      return NextResponse.json(
+        { error: 'User not found. Please login again.' },
+        { status: 404 }
+      );
+    }
+
+    console.log('User validation successful:', userId);
+
     // Create complaint
+    console.log('Creating aspirasi in database...');
     const aspirasi = await prisma.aspirasi.create({
       data: {
-        user_id: parseInt(session.user.id),
+        user_id: userId,
         kategori_id: kategori.id,
         judul,
         lokasi,
@@ -121,6 +167,7 @@ export async function POST(request: NextRequest) {
         kategori: true
       }
     });
+    console.log('Aspirasi created successfully:', aspirasi.id, 'Nomor Tiket:', aspirasi.nomor_tiket);
 
     const admins = await prisma.user.findMany({
       where: { role: 'admin' },

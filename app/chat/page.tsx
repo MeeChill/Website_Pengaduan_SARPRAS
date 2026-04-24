@@ -1326,6 +1326,20 @@ export default function ChatPage() {
   const handleSubmitLaporan = async () => {
     setIsSubmittingLaporan(true);
     const ticket = generateTicket();
+    
+    // Validasi session sebelum submit
+    if (!session?.user?.id) {
+      setLaporanMessages((prev) => [
+        ...prev,
+        {
+          role: "bot",
+          content: `❌ **Gagal mengirim laporan.**\n\nKamu harus login terlebih dahulu untuk mengirim laporan.`,
+        },
+      ]);
+      setIsSubmittingLaporan(false);
+      return;
+    }
+    
     try {
       const formData = new FormData();
       formData.append("judul", laporanData.judul);
@@ -1336,12 +1350,45 @@ export default function ChatPage() {
       formData.append("riwayat_chat", JSON.stringify(laporanMessages));
       laporanData.foto.forEach((f) => formData.append("foto", f));
 
+      console.log('Session user data:', {
+        user_id: session.user.id,
+        user_id_type: typeof session.user.id,
+        user_name: session.user.name,
+        user_email: session.user.email
+      });
+
+      console.log('Mengirim laporan dengan data:', {
+        judul: laporanData.judul,
+        lokasi: laporanData.lokasi,
+        deskripsi: laporanData.deskripsi,
+        nomor_tiket: ticket,
+        foto_count: laporanData.foto.length,
+        user_id: session.user.id
+      });
+
       const res = await fetch("/api/aspirasi", {
         method: "POST",
         body: formData,
+        // Next.js akan otomatis mengirim cookies untuk auth
       });
+      
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Gagal mengirim laporan");
+      console.log('Response dari API:', { status: res.status, data });
+      
+      if (!res.ok) {
+        // Handle specific error messages dari API
+        let errorMessage = "Gagal mengirim laporan";
+        if (res.status === 401) {
+          errorMessage = "Sesi login telah berakhir. Silakan login kembali.";
+        } else if (res.status === 400) {
+          errorMessage = data.error || "Data laporan tidak lengkap. Silakan periksa kembali.";
+        } else if (res.status === 500) {
+          errorMessage = "Server sedang bermasalah. Silakan coba lagi nanti.";
+        } else if (data.error) {
+          errorMessage = data.error;
+        }
+        throw new Error(errorMessage);
+      }
 
       const nomor = data.nomor_tiket ?? ticket;
       setLaporanSuccess(nomor);
@@ -1385,12 +1432,13 @@ export default function ChatPage() {
       // Clear laporan state after successful submission
       sessionStorage.removeItem("laporan_state");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Terjadi kesalahan";
+      console.error('Error saat mengirim laporan:', err);
+      const msg = err instanceof Error ? err.message : "Terjadi kesalahan yang tidak diketahui";
       setLaporanMessages((prev) => [
         ...prev,
         {
           role: "bot",
-          content: `❌ **Gagal mengirim laporan.**\n\n${msg}\n\nSilakan coba lagi.`,
+          content: `❌ **Gagal mengirim laporan.**\n\n${msg}\n\nSilakan coba lagi atau hubungi admin jika masalah berlanjut.`,
         },
       ]);
     } finally {

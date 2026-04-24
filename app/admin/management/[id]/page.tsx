@@ -12,6 +12,7 @@ import {
   Hash,
   Clock,
   CheckCircle,
+  XCircle,
   AlertCircle,
   Upload,
   ImagePlus,
@@ -195,6 +196,9 @@ export default function ManagementDetailPage() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState<string | null>(null);
+  const [selesaiModalOpen, setSelesaiModalOpen] = useState(false);
+  const [selesaiKeterangan, setSelesaiKeterangan] = useState("");
+  const [selesaiError, setSelesaiError] = useState<string | null>(null);
 
   // Progress update
   const [progressText, setProgressText] = useState("");
@@ -330,6 +334,12 @@ export default function ManagementDetailPage() {
       setRejectModalOpen(true);
       return;
     }
+    if (newStatus === "selesai") {
+      setSelesaiKeterangan("");
+      setSelesaiError(null);
+      setSelesaiModalOpen(true);
+      return;
+    }
     setUpdatingStatus(true);
     try {
       const res = await fetch(`/api/aspirasi/${aspirasi.id}/status`, {
@@ -343,6 +353,40 @@ export default function ManagementDetailPage() {
       if (res.ok) {
         setAspirasi((prev) => prev ? { ...prev, status: newStatus } : prev);
         await fetchAspirasi();
+      }
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  // ── Submit status selesai ──────────────────────────────────────────────────
+
+  const handleSubmitSelesai = async () => {
+    if (!selesaiKeterangan.trim() || !aspirasi) return;
+    
+    // Validasi foto after sudah diupload
+    if (!aspirasi.foto_after) {
+      setSelesaiError("Foto after wajib diupload sebelum menyelesaikan laporan");
+      return;
+    }
+    
+    setUpdatingStatus(true);
+    try {
+      const res = await fetch(`/api/aspirasi/${aspirasi.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "selesai",
+          keterangan_selesai: selesaiKeterangan.trim(),
+        }),
+      });
+      if (res.ok) {
+        setSelesaiModalOpen(false);
+        setAspirasi((prev) => prev ? { ...prev, status: "selesai" } : prev);
+        await fetchAspirasi();
+      } else {
+        const data = await res.json();
+        setSelesaiError(data.error || "Gagal update status");
       }
     } finally {
       setUpdatingStatus(false);
@@ -503,6 +547,112 @@ export default function ManagementDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Selesai modal */}
+      {selesaiModalOpen && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setSelesaiModalOpen(false);
+              setSelesaiError(null);
+            }
+          }}
+        >
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900/95 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-white/10">
+              <div>
+                <p className="text-white font-bold">Selesaikan Laporan</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Keterangan wajib diisi untuk menjelaskan hasil penyelesaian laporan.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelesaiModalOpen(false);
+                  setSelesaiError(null);
+                }}
+                className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
+                aria-label="Tutup"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-3">
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Keterangan penyelesaian
+              </label>
+              <textarea
+                value={selesaiKeterangan}
+                onChange={(e) => {
+                  setSelesaiKeterangan(e.target.value);
+                  setSelesaiError(null);
+                }}
+                rows={4}
+                placeholder="Contoh: Kerusakan telah diperbaiki dengan mengganti komponen yang rusak."
+                className="w-full bg-slate-800/60 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 transition-all resize-none text-sm"
+              />
+              {selesaiError && (
+                <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                  {selesaiError}
+                </div>
+              )}
+
+              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  Persyaratan
+                </p>
+                <ul className="text-xs text-slate-200 space-y-1">
+                  <li className="flex items-center gap-2">
+                    {aspirasi.foto_after ? (
+                      <CheckCircle className="w-3 h-3 text-emerald-400" />
+                    ) : (
+                      <XCircle className="w-3 h-3 text-red-400" />
+                    )}
+                    <span className={aspirasi.foto_after ? "text-emerald-300" : "text-red-300"}>
+                      Foto after sudah diupload
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {selesaiKeterangan.trim() ? (
+                      <CheckCircle className="w-3 h-3 text-emerald-400" />
+                    ) : (
+                      <XCircle className="w-3 h-3 text-red-400" />
+                    )}
+                    <span className={selesaiKeterangan.trim() ? "text-emerald-300" : "text-red-300"}>
+                      Keterangan penyelesaian sudah diisi
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-white/10 flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <button
+                onClick={() => {
+                  setSelesaiModalOpen(false);
+                  setSelesaiError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-semibold transition-all"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSubmitSelesai}
+                disabled={updatingStatus || !selesaiKeterangan.trim() || !aspirasi.foto_after}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-sm font-semibold transition-all"
+              >
+                {updatingStatus ? "Memproses..." : "Selesaikan Laporan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">

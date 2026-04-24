@@ -220,6 +220,8 @@ export default function Reports() {
         'Status',
         'Tanggal Input',
         'Tanggal Selesai',
+        'Rating',
+        'Feedback',
       ]],
       body: filteredAspirasi.map((a, idx) => [
         idx + 1,
@@ -231,6 +233,8 @@ export default function Reports() {
         a.status.replace('_', ' '),
         new Date(a.tanggal_input).toLocaleString('id-ID'),
         a.tanggal_selesai ? new Date(a.tanggal_selesai).toLocaleString('id-ID') : '-',
+        a.rating ? a.rating.toString() : '-',
+        a.feedback || '-',
       ]),
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [15, 118, 110] },

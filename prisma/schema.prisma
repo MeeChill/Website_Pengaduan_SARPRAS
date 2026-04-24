@@ -59,6 +59,7 @@ model Aspirasi {
   status          String    @default("pending") // pending, dalam_progres, selesai
   rating          Int?
   feedback        String?
+  keterangan_selesai String?
 
   user            User           @relation("UserAspirasi", fields: [user_id], references: [id])
   kategori        Kategori       @relation(fields: [kategori_id], references: [id])
