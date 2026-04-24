@@ -1357,7 +1357,7 @@ export default function ChatPage() {
             ]
           : []),
         {
-          role: "bot",
+          role: "bot" as const,
           content: `🎉 **Laporan berhasil dikirim!**\n\nNomor tiket kamu:\n**${nomor}**\n\nRiwayat percakapan laporan ini sudah disimpan dan tetap berada di tab **Buat Laporan**.\n\nTerima kasih telah melaporkan! 🙏`,
         },
       ]);
@@ -1366,14 +1366,14 @@ export default function ChatPage() {
         ...(data.aspirasi?.foto_before
           ? [
               {
-                role: "bot",
+                role: "bot" as const,
                 content: "📷 Foto laporan kamu sudah terkirim ke admin:",
                 imageUrl: data.aspirasi.foto_before as string,
               },
             ]
           : []),
         {
-          role: "bot",
+          role: "bot" as const,
           content: `🎉 **Laporan berhasil dikirim!**\n\nNomor tiket kamu:\n**${nomor}**\n\nRiwayat percakapan laporan ini sudah disimpan dan tetap berada di tab **Buat Laporan**.\n\nTerima kasih telah melaporkan! 🙏`,
         },
       ];
